@@ -24,10 +24,32 @@ const playVoice = (text: string) => {
   }
 };
 
+const PLAYER_EMOJIS = [
+  // Kids / Fofos (até 9 anos)
+  { emoji: "🧸", label: "Ursinho", type: "kids" },
+  { emoji: "🦄", label: "Unicórnio", type: "kids" },
+  { emoji: "🦖", label: "Dinossauro", type: "kids" },
+  { emoji: "🚀", label: "Foguete", type: "kids" },
+  { emoji: "🦁", label: "Leão", type: "kids" },
+  { emoji: "🐼", label: "Panda", type: "kids" },
+  { emoji: "🍦", label: "Sorvete", type: "kids" },
+  { emoji: "🌈", label: "Arco-íris", type: "kids" },
+  // Teens / Descolados (10 a 15 anos)
+  { emoji: "🎮", label: "Controle", type: "teens" },
+  { emoji: "😎", label: "Estilo", type: "teens" },
+  { emoji: "🎧", label: "Fones", type: "teens" },
+  { emoji: "🛹", label: "Skate", type: "teens" },
+  { emoji: "⚡", label: "Raio", type: "teens" },
+  { emoji: "👾", label: "Alien", type: "teens" },
+  { emoji: "💻", label: "Tech", type: "teens" },
+  { emoji: "🤘", label: "Rock", type: "teens" }
+];
+
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState<number>(1);
   const [name, setName] = useState<string>("");
   const [avatar, setAvatar] = useState<AvatarType>("bunny");
+  const [selectedEmoji, setSelectedEmoji] = useState<string>("🚀");
   const [ageGroup, setAgeGroup] = useState<AgeGroupType>("kids");
   const [goal, setGoal] = useState<string>("speak");
   const [dailyMinutes, setDailyMinutes] = useState<number>(10);
@@ -52,6 +74,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       id: Math.random().toString(36).substring(7),
       displayName: name.trim(),
       avatar,
+      profileEmoji: selectedEmoji,
       ageGroup,
       goal,
       dailyMinutes,
@@ -154,12 +177,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <h2 className="text-xl font-extrabold text-sky-950 mt-8 mb-4">
               Quantos anos você tem?
             </h2>
-            <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+            <div className="grid grid-cols-2 gap-4 w-full max-w-md mb-6">
               <button
                 type="button"
                 id="age-kids-btn"
-                onClick={() => setAgeGroup("kids")}
-                className={`p-4 rounded-2xl border-3 font-black text-base flex flex-col items-center gap-2 transition-all ${
+                onClick={() => {
+                  setAgeGroup("kids");
+                  setSelectedEmoji("🧸");
+                }}
+                className={`p-4 rounded-2xl border-3 font-black text-base flex flex-col items-center gap-2 transition-all cursor-pointer ${
                   ageGroup === "kids" 
                     ? "border-sky-400 bg-sky-50 text-sky-700 scale-[1.03] shadow-md" 
                     : "border-slate-100 bg-white hover:border-slate-200 text-slate-600"
@@ -173,8 +199,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               <button
                 type="button"
                 id="age-teens-btn"
-                onClick={() => setAgeGroup("teens")}
-                className={`p-4 rounded-2xl border-3 font-black text-base flex flex-col items-center gap-2 transition-all ${
+                onClick={() => {
+                  setAgeGroup("teens");
+                  setSelectedEmoji("🎮");
+                }}
+                className={`p-4 rounded-2xl border-3 font-black text-base flex flex-col items-center gap-2 transition-all cursor-pointer ${
                   ageGroup === "teens" 
                     ? "border-sky-400 bg-sky-50 text-sky-700 scale-[1.03] shadow-md" 
                     : "border-slate-100 bg-white hover:border-slate-200 text-slate-600"
@@ -186,7 +215,65 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </button>
             </div>
 
-            <div className="mt-8 w-full flex justify-end max-w-md">
+            {/* EMOJI SELECTOR SECTION */}
+            <h2 className="text-xl font-extrabold text-sky-950 mt-4 mb-2">
+              Escolha seu Emoji de Jogador 🌟
+            </h2>
+            <p className="text-xs text-slate-400 mb-4 font-bold uppercase tracking-wider">
+              {ageGroup === "kids" ? "🧸 Recomendados para crianças" : "⚡ Recomendados para adolescentes"}
+            </p>
+
+            {/* Grid of emojis */}
+            <div className="grid grid-cols-8 gap-2 w-full max-w-md mb-6 bg-slate-50 p-3.5 rounded-[24px] border border-slate-100">
+              {PLAYER_EMOJIS.map((item) => {
+                const isSelected = selectedEmoji === item.emoji;
+                const isRecommended = item.type === ageGroup;
+                return (
+                  <button
+                    key={item.emoji}
+                    type="button"
+                    onClick={() => setSelectedEmoji(item.emoji)}
+                    className={`w-10 h-10 md:w-11 md:h-11 text-2xl rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+                      isSelected 
+                        ? "bg-sky-400 text-white scale-110 shadow-md ring-2 ring-sky-300" 
+                        : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-100"
+                    }`}
+                    title={item.label}
+                  >
+                    <span>{item.emoji}</span>
+                    {isRecommended && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border border-white" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Live Profile Preview Card */}
+            {name.trim() && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-md mb-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-1 rounded-3xl shadow-lg mt-2"
+              >
+                <div className="bg-white rounded-[22px] p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-3xl select-none shadow-inner border border-purple-200">
+                      {selectedEmoji}
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest block">Crachá do Explorador</span>
+                      <span className="text-base font-black text-slate-800 leading-none">{name}</span>
+                    </div>
+                  </div>
+                  <div className="bg-indigo-100 text-indigo-700 font-extrabold text-xs px-3 py-1 rounded-full uppercase tracking-wider">
+                    {ageGroup === "kids" ? "Nível Kids 🧸" : "Nível Teen 🎮"}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            <div className="mt-4 w-full flex justify-end max-w-md">
               <button
                 type="button"
                 id="next-step-1"

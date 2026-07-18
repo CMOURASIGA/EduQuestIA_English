@@ -5,6 +5,7 @@ export interface UserProfile {
   id: string;
   displayName: string;
   avatar: AvatarType;
+  profileEmoji: string;
   ageGroup: AgeGroupType;
   goal: string;
   dailyMinutes: number;

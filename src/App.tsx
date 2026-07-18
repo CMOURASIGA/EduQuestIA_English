@@ -12,6 +12,7 @@ import TutorChat from "./components/TutorChat";
 import AdminPanel from "./components/AdminPanel";
 import VocabularyTrainer from "./components/VocabularyTrainer";
 import WritingChallenge from "./components/WritingChallenge";
+import JourneyGuide from "./components/JourneyGuide";
 import { 
   Sparkles, BookOpen, MessageSquare, Flame, LogOut, 
   Settings, PenTool, Home, Star, Play, Lock, CheckCircle2, Award 
@@ -30,6 +31,7 @@ export default function App() {
   // App visual states
   const [activeTab, setActiveTab] = useState<"trilha" | "vocabulario" | "tutor" | "escrita" | "admin">("trilha");
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   // Initialize data on load
   useEffect(() => {
@@ -238,11 +240,11 @@ export default function App() {
           <div className="flex items-center gap-4 md:gap-6">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-bold text-gray-500">Olá, Explorador!</p>
-              <p className="text-xl font-black text-[#1A1C3D]">{profile.displayName}</p>
+              <p className="text-xl font-black text-[#1A1C3D]">{profile.displayName} {profile.profileEmoji || "🚀"}</p>
             </div>
-            <div className="w-16 h-16 rounded-full border-4 border-white shadow-md overflow-hidden relative group">
-              <div className="w-full h-full bg-orange-300 flex items-center justify-center text-3xl select-none">
-                {buddySpec.icon}
+            <div className="w-16 h-16 rounded-full border-4 border-white shadow-md overflow-hidden relative group bg-gradient-to-tr from-purple-500 via-indigo-500 to-sky-400">
+              <div className="w-full h-full flex items-center justify-center text-3xl select-none">
+                {profile.profileEmoji || "🚀"}
               </div>
             </div>
             {/* Quick LogOut / Change Profile action */}
@@ -413,6 +415,35 @@ export default function App() {
                 <p className="text-green-100 text-xs font-bold mt-1 uppercase tracking-wider">
                   Desafios Gramaticais
                 </p>
+              </div>
+
+              {/* Block 6: Guia de Sobrevivência Espacial & Gamificação (Bento Banner) - span-12 */}
+              <div 
+                onClick={() => setShowGuide(true)}
+                className="md:col-span-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-[40px] shadow-xl p-8 flex flex-col md:flex-row justify-between items-center text-white border-b-8 border-indigo-800 cursor-pointer hover:scale-[1.01] transition-transform gap-6"
+                id="journey-guide-bento-card"
+              >
+                <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+                  <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center text-4xl shrink-0 select-none animate-bounce">
+                    🚀
+                  </div>
+                  <div>
+                    <h4 className="text-2xl font-black">Como funciona a SpaceAcademy?</h4>
+                    <p className="text-purple-100 text-xs md:text-sm font-semibold mt-1 max-w-xl">
+                      Entenda as regras da gamificação, ofensivas diárias (streaks), bônus de XP, todos os níveis de inglês disponíveis e as ferramentas inteligentes de IA!
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowGuide(true);
+                  }}
+                  className="px-6 py-4 bg-white text-indigo-700 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-purple-50 transition-colors shrink-0 shadow-md"
+                >
+                  Abrir Guia do Aluno 📖
+                </button>
               </div>
 
               {/* Trail map expansion row - span-12 */}
@@ -639,6 +670,13 @@ export default function App() {
 
         </div>
       </nav>
+
+      {/* Interactive Journey Guide Modal */}
+      <JourneyGuide 
+        isOpen={showGuide} 
+        onClose={() => setShowGuide(false)} 
+        currentXp={profile.xp} 
+      />
 
     </div>
   );
