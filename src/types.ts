@@ -14,6 +14,7 @@ export interface UserProfile {
   lastActiveDate: string | null;
   completedLessons: string[];
   vocabularyCount: number;
+  password?: string;
 }
 
 export type ExerciseType = 

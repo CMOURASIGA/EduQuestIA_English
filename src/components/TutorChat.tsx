@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { UserProfile, ChatMessage, AvatarType } from "../types";
 import { Volume2, Send, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
+import { getLevelAndProgress } from "../utils/levels";
 
 interface TutorChatProps {
   profile: UserProfile;
@@ -68,6 +69,8 @@ export default function TutorChat({ profile }: TutorChatProps) {
         content: m.content
       }));
 
+      const { level: userLevel } = getLevelAndProgress(profile.xp);
+
       const res = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,7 +79,8 @@ export default function TutorChat({ profile }: TutorChatProps) {
           history,
           avatar: avatarSpec.name,
           ageGroup: profile.ageGroup,
-          childName: profile.displayName
+          childName: profile.displayName,
+          userLevel
         })
       });
 

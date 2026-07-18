@@ -3,6 +3,7 @@ import {
   X, Sparkles, Flame, Star, Award, BookOpen, 
   MessageSquare, PenTool, Shield, Settings, Play, Info 
 } from "lucide-react";
+import { getLevelAndProgress, getLevelTitle, getLevelPerk } from "../utils/levels";
 
 interface JourneyGuideProps {
   isOpen: boolean;
@@ -15,16 +16,22 @@ export default function JourneyGuide({ isOpen, onClose, currentXp }: JourneyGuid
 
   if (!isOpen) return null;
 
-  // Level names and details based on XP increments of 450
-  const levelsInfo = [
-    { num: 1, name: "Recruta do Espaço 🛰️", xpMin: 0, xpMax: 449, perk: "Início da jornada! Desbloqueie as primeiras ilhas de vocabulário e aprenda a se apresentar em inglês." },
-    { num: 2, name: "Piloto de Aprendizado 🚀", xpMin: 450, xpMax: 899, perk: "Desbloqueia diálogos com o Tutor de IA sobre seus tópicos favoritos (Minecraft, futebol, música!)." },
-    { num: 3, name: "Explorador das Estrelas 🪐", xpMin: 900, xpMax: 1349, perk: "Libera desafios complexos de Escrita Mágica com frases de conversação real e expressões idiomáticas." },
-    { num: 4, name: "Astronauta Fluente ☄️", xpMin: 1350, xpMax: 1799, perk: "Acesso a relatórios avançados de proficiência e domínio completo de pronúncia realista de mais de 100 palavras." },
-    { num: 5, name: "Guardião do Cosmos 🌟", xpMin: 1800, xpMax: 99999, perk: "Nível máximo! Domínio absoluto da Trilha A1 Básica e capacidade de criar lições customizadas infinitas." }
-  ];
+  const { level: currentLevel } = getLevelAndProgress(currentXp);
 
-  const currentLevel = Math.floor(currentXp / 450) + 1;
+  // Generate levels list dynamically up to current level + 3, with a minimum of 10 levels
+  const maxLevelToShow = Math.max(10, currentLevel + 3);
+  const levelsInfo = [];
+  for (let l = 1; l <= maxLevelToShow; l++) {
+    const minXp = l === 1 ? 0 : (l - 1) * 200 + (l - 1) * (l - 2) * 50;
+    const maxXp = l * 200 + l * (l - 1) * 50 - 1;
+    levelsInfo.push({
+      num: l,
+      name: getLevelTitle(l),
+      xpMin: minXp,
+      xpMax: maxXp,
+      perk: getLevelPerk(l)
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
@@ -148,9 +155,9 @@ export default function JourneyGuide({ isOpen, onClose, currentXp }: JourneyGuid
                 <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-xs flex gap-3.5 items-start">
                   <span className="text-3xl bg-blue-50 p-2 rounded-xl shrink-0 select-none">🏆</span>
                   <div>
-                    <h4 className="font-black text-slate-800 text-sm">Níveis de Conquista</h4>
+                    <h4 className="font-black text-slate-800 text-sm">Níveis de Conquista Progressivos</h4>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      A cada <strong>450 XP</strong> acumulados, sua patente espacial aumenta automaticamente. Mostre para seus pais ou amigos o nível em que você está!
+                      Sua patente espacial aumenta conforme você acumula XP. O sistema é <strong>infinito</strong> e, igual a um RPG, cada nível exige mais XP que o anterior! Isso garante um desafio constante e duradouro.
                     </p>
                   </div>
                 </div>

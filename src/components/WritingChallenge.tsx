@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { UserProfile, WritingFeedback } from "../types";
 import { Sparkles, Send, Award, BookOpen, AlertCircle, Volume2 } from "lucide-react";
+import { getLevelAndProgress, getLevelTitle } from "../utils/levels";
 
 interface WritingChallengeProps {
   profile: UserProfile;
@@ -70,13 +71,15 @@ export default function WritingChallenge({ profile, onXpEarned }: WritingChallen
     setFeedback(null);
 
     try {
+      const { level: userLevel } = getLevelAndProgress(profile.xp);
       const res = await fetch("/api/writing-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: inputText,
           prompt: selectedChallenge.prompt,
-          targetLevel: profile.ageGroup === "kids" ? "A1-Kids" : "A1-Teens"
+          targetLevel: profile.ageGroup === "kids" ? "A1-Kids" : "A1-Teens",
+          userLevel
         })
       });
 
@@ -202,7 +205,9 @@ export default function WritingChallenge({ profile, onXpEarned }: WritingChallen
               <span className="text-3xl">🧙‍♂️</span>
               <div>
                 <h4 className="font-black text-slate-800 text-sm">Correção Mágica de IA</h4>
-                <p className="text-[10px] font-bold text-amber-700 leading-tight">Avaliado para nível Iniciante</p>
+                <p className="text-[10px] font-bold text-amber-700 leading-tight">
+                  Avaliado para o nível {getLevelTitle(getLevelAndProgress(profile.xp).level)}
+                </p>
               </div>
             </div>
 

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { UserProfile, Lesson, VocabularyItem } from "./types";
+import { UserProfile, Lesson, VocabularyItem, AgeGroupType } from "./types";
 import { INITIAL_LESSONS, INITIAL_VOCABULARY } from "./data";
 import Onboarding from "./components/Onboarding";
 import LessonScreen from "./components/LessonScreen";
@@ -13,10 +13,17 @@ import AdminPanel from "./components/AdminPanel";
 import VocabularyTrainer from "./components/VocabularyTrainer";
 import WritingChallenge from "./components/WritingChallenge";
 import JourneyGuide from "./components/JourneyGuide";
+import { getLevelAndProgress, getLevelTitle } from "./utils/levels";
 import { 
   Sparkles, BookOpen, MessageSquare, Flame, LogOut, 
-  Settings, PenTool, Home, Star, Play, Lock, CheckCircle2, Award 
+  Settings, PenTool, Home, Star, Play, Lock, CheckCircle2, Award,
+  Edit3, Key, X, Check, Save, User, Eye, EyeOff, AlertCircle, Heart, Info, Clipboard, Upload
 } from "lucide-react";
+import SupportModal from "./components/support/SupportModal";
+import SupporterBadge from "./components/support/SupporterBadge";
+import SupportEntryCard from "./components/support/SupportEntryCard";
+import { isSupporterActive, exportAllData, importAllData } from "./services/supportStorage";
+import { logTelemetryEvent } from "./services/telemetryService";
 
 export default function App() {
   // Core Profile state
@@ -32,21 +39,63 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"trilha" | "vocabulario" | "tutor" | "escrita" | "admin">("trilha");
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+
+  // Support / Pix Modal state
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supporterActive, setSupporterActive] = useState(false);
+
+  // State to force re-render components that check supporter status
+  const syncSupportStatus = () => {
+    setSupporterActive(isSupporterActive());
+  };
+
+  useEffect(() => {
+    syncSupportStatus();
+  }, [profile]);
+
+  // Edit Profile form states
+  const [editedName, setEditedName] = useState("");
+  const [editedEmoji, setEditedEmoji] = useState("🚀");
+  const [editedAgeGroup, setEditedAgeGroup] = useState<AgeGroupType>("kids");
+  const [editedPassword, setEditedPassword] = useState("");
+  const [showEditedPassword, setShowEditedPassword] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState(false);
+
+  // Initialize edit profile form when opened
+  useEffect(() => {
+    if (showEditProfile && profile) {
+      setEditedName(profile.displayName);
+      setEditedEmoji(profile.profileEmoji || "🚀");
+      setEditedAgeGroup(profile.ageGroup || "kids");
+      setEditedPassword(profile.password || "");
+      setShowEditedPassword(false);
+      setEditError("");
+      setEditSuccess(false);
+    }
+  }, [showEditProfile, profile]);
 
   // Initialize data on load
   useEffect(() => {
-    // 1. Get profile
+    // 1. Get active profile
     const storedProfile = localStorage.getItem("playenglish_profile");
     if (storedProfile) {
       try {
         setProfile(JSON.parse(storedProfile));
       } catch (err) {
-        console.error("Erro ao ler perfil:", err);
+        console.error("Erro ao ler perfil ativo:", err);
       }
     }
+  }, []);
 
-    // 2. Get custom lessons
-    const storedLessons = localStorage.getItem("playenglish_lessons");
+  // Synchronize lessons and vocabulary whenever the profile changes
+  useEffect(() => {
+    if (!profile) return;
+
+    // Load user-specific lessons
+    const userLessonsKey = `playenglish_lessons_${profile.id}`;
+    const storedLessons = localStorage.getItem(userLessonsKey);
     if (storedLessons) {
       try {
         setLessons(JSON.parse(storedLessons));
@@ -54,12 +103,26 @@ export default function App() {
         setLessons(INITIAL_LESSONS);
       }
     } else {
-      setLessons(INITIAL_LESSONS);
-      localStorage.setItem("playenglish_lessons", JSON.stringify(INITIAL_LESSONS));
+      // Fallback to legacy generic key if exists, or INITIAL_LESSONS
+      const legacyLessons = localStorage.getItem("playenglish_lessons");
+      if (legacyLessons) {
+        try {
+          const parsed = JSON.parse(legacyLessons);
+          setLessons(parsed);
+          localStorage.setItem(userLessonsKey, JSON.stringify(parsed));
+        } catch {
+          setLessons(INITIAL_LESSONS);
+          localStorage.setItem(userLessonsKey, JSON.stringify(INITIAL_LESSONS));
+        }
+      } else {
+        setLessons(INITIAL_LESSONS);
+        localStorage.setItem(userLessonsKey, JSON.stringify(INITIAL_LESSONS));
+      }
     }
 
-    // 3. Get custom vocabulary
-    const storedVocab = localStorage.getItem("playenglish_vocabulary");
+    // Load user-specific vocabulary
+    const userVocabKey = `playenglish_vocabulary_${profile.id}`;
+    const storedVocab = localStorage.getItem(userVocabKey);
     if (storedVocab) {
       try {
         setVocabulary(JSON.parse(storedVocab));
@@ -67,37 +130,80 @@ export default function App() {
         setVocabulary(INITIAL_VOCABULARY);
       }
     } else {
-      setVocabulary(INITIAL_VOCABULARY);
-      localStorage.setItem("playenglish_vocabulary", JSON.stringify(INITIAL_VOCABULARY));
+      // Fallback to legacy generic key if exists, or INITIAL_VOCABULARY
+      const legacyVocab = localStorage.getItem("playenglish_vocabulary");
+      if (legacyVocab) {
+        try {
+          const parsed = JSON.parse(legacyVocab);
+          setVocabulary(parsed);
+          localStorage.setItem(userVocabKey, JSON.stringify(parsed));
+        } catch {
+          setVocabulary(INITIAL_VOCABULARY);
+          localStorage.setItem(userVocabKey, JSON.stringify(INITIAL_VOCABULARY));
+        }
+      } else {
+        setVocabulary(INITIAL_VOCABULARY);
+        localStorage.setItem(userVocabKey, JSON.stringify(INITIAL_VOCABULARY));
+      }
     }
-  }, []);
+  }, [profile?.id]);
 
   // Save profile helper
   const saveProfile = (newProfile: UserProfile) => {
     setProfile(newProfile);
     localStorage.setItem("playenglish_profile", JSON.stringify(newProfile));
+
+    // Update inside accounts list
+    const stored = localStorage.getItem("playenglish_accounts");
+    if (stored) {
+      try {
+        const accounts: UserProfile[] = JSON.parse(stored);
+        const idx = accounts.findIndex(a => a.id === newProfile.id);
+        if (idx !== -1) {
+          accounts[idx] = newProfile;
+          localStorage.setItem("playenglish_accounts", JSON.stringify(accounts));
+        } else {
+          accounts.push(newProfile);
+          localStorage.setItem("playenglish_accounts", JSON.stringify(accounts));
+        }
+      } catch (err) {
+        console.error("Erro ao atualizar conta na lista:", err);
+      }
+    } else {
+      localStorage.setItem("playenglish_accounts", JSON.stringify([newProfile]));
+    }
   };
 
   // Save lessons helper
   const handleUpdateLessons = (updated: Lesson[]) => {
     setLessons(updated);
-    localStorage.setItem("playenglish_lessons", JSON.stringify(updated));
+    if (profile) {
+      localStorage.setItem(`playenglish_lessons_${profile.id}`, JSON.stringify(updated));
+    } else {
+      localStorage.setItem("playenglish_lessons", JSON.stringify(updated));
+    }
   };
 
   // Reset lessons helper
   const handleResetLessons = () => {
     if (confirm("Quer mesmo restaurar todas as lições para o modelo original? Isso apagará seus exercícios customizados.")) {
       setLessons(INITIAL_LESSONS);
-      localStorage.setItem("playenglish_lessons", JSON.stringify(INITIAL_LESSONS));
+      if (profile) {
+        localStorage.setItem(`playenglish_lessons_${profile.id}`, JSON.stringify(INITIAL_LESSONS));
+      } else {
+        localStorage.setItem("playenglish_lessons", JSON.stringify(INITIAL_LESSONS));
+      }
     }
   };
 
   // Update vocabulary list helper
   const handleUpdateVocabulary = (updated: VocabularyItem[]) => {
     setVocabulary(updated);
-    localStorage.setItem("playenglish_vocabulary", JSON.stringify(updated));
     if (profile) {
+      localStorage.setItem(`playenglish_vocabulary_${profile.id}`, JSON.stringify(updated));
       saveProfile({ ...profile, vocabularyCount: updated.length });
+    } else {
+      localStorage.setItem("playenglish_vocabulary", JSON.stringify(updated));
     }
   };
 
@@ -207,10 +313,12 @@ export default function App() {
   }[profile.avatar];
 
   // Leveling Calculations
-  const currentLevel = Math.floor(profile.xp / 450) + 1;
-  const xpInCurrentLevel = profile.xp % 450;
-  const xpPercentage = Math.min(100, Math.floor((xpInCurrentLevel / 450) * 100));
-  const nextLevelXpNeeded = 450 - xpInCurrentLevel;
+  const levelData = getLevelAndProgress(profile.xp);
+  const currentLevel = levelData.level;
+  const xpInCurrentLevel = levelData.xpInCurrentLevel;
+  const xpPercentage = levelData.xpPercentage;
+  const nextLevelXpNeeded = levelData.xpRemaining;
+  const xpNeededForNextLevel = levelData.xpNeededForNextLevel;
 
   // Recommended Lesson logic
   const recommendedLesson = lessons.find(l => !profile.completedLessons.includes(l.id)) || lessons[0];
@@ -238,15 +346,39 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4 md:gap-6">
-            <div className="text-right hidden sm:block">
+            <SupporterBadge showTooltip={true} size="md" />
+            <div 
+              onClick={() => setShowEditProfile(true)}
+              className="text-right hidden sm:block cursor-pointer hover:opacity-80 transition-opacity"
+              title="Clique para editar seu perfil"
+            >
               <p className="text-sm font-bold text-gray-500">Olá, Explorador!</p>
-              <p className="text-xl font-black text-[#1A1C3D]">{profile.displayName} {profile.profileEmoji || "🚀"}</p>
+              <p className="text-xl font-black text-[#1A1C3D] flex items-center gap-1.5 justify-end">
+                {profile.displayName} {profile.profileEmoji || "🚀"}
+                <Edit3 className="w-4 h-4 text-slate-400" />
+              </p>
             </div>
-            <div className="w-16 h-16 rounded-full border-4 border-white shadow-md overflow-hidden relative group bg-gradient-to-tr from-purple-500 via-indigo-500 to-sky-400">
-              <div className="w-full h-full flex items-center justify-center text-3xl select-none">
+            <button
+              type="button"
+              onClick={() => setShowEditProfile(true)}
+              className="w-16 h-16 rounded-full border-4 border-white shadow-md overflow-hidden relative group bg-gradient-to-tr from-purple-500 via-indigo-500 to-sky-400 cursor-pointer hover:scale-105 transition-transform"
+              title="Clique para editar seu perfil"
+            >
+              <div className="w-full h-full flex items-center justify-center text-3xl select-none animate-pulse">
                 {profile.profileEmoji || "🚀"}
               </div>
-            </div>
+            </button>
+            
+            {/* Edit Profile button */}
+            <button
+              type="button"
+              onClick={() => setShowEditProfile(true)}
+              className="p-3 bg-white hover:bg-sky-50 text-slate-400 hover:text-sky-600 rounded-2xl transition-all cursor-pointer shadow-sm border border-slate-100"
+              title="Editar Perfil"
+            >
+              <Edit3 className="w-5 h-5" />
+            </button>
+
             {/* Quick LogOut / Change Profile action */}
             <button
               type="button"
@@ -329,13 +461,16 @@ export default function App() {
               {/* Block 2: Sua Jornada (Level Progress / Stats) - span-4 */}
               <div className="md:col-span-4 bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 flex flex-col justify-between border-b-8 border-purple-500 min-h-[340px]">
                 <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-black text-[#1A1C3D] text-xl">Sua Jornada</h3>
-                    <span className="text-purple-600 font-black text-xs bg-purple-50 px-3 py-1 rounded-full">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="font-black text-[#1A1C3D] text-xl leading-tight">Sua Jornada</h3>
+                      <p className="text-xs font-bold text-purple-500 mt-1">{getLevelTitle(currentLevel)}</p>
+                    </div>
+                    <span className="text-purple-600 font-black text-xs bg-purple-50 px-3 py-1.5 rounded-full shrink-0">
                       Nível {currentLevel}
                     </span>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-4 mt-6">
                     <div className="relative h-4 bg-gray-100 rounded-full overflow-hidden">
                       <div 
                         className="absolute top-0 left-0 h-full bg-purple-500 rounded-full transition-all duration-500"
@@ -343,7 +478,7 @@ export default function App() {
                       ></div>
                     </div>
                     <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                      <span>{xpInCurrentLevel} / 450 XP</span>
+                      <span>{xpInCurrentLevel} / {xpNeededForNextLevel} XP</span>
                       <span>Faltam {nextLevelXpNeeded} XP para o Nível {currentLevel + 1}</span>
                     </div>
                   </div>
@@ -567,19 +702,107 @@ export default function App() {
 
           {/* TAB 5: Admin Panel */}
           {activeTab === "admin" && (
-            <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border-b-8 border-rose-500 flex flex-col gap-6">
-              <div>
-                <h2 className="text-3xl font-black text-[#1A1C3D]">Supervisor Acadêmico 🛠️</h2>
-                <p className="text-gray-500 text-sm font-semibold mt-1">
-                  Gerencie o conteúdo didático e as lições disponíveis para os alunos em tempo real sem fazer deploys.
-                </p>
+            <div className="space-y-6 flex flex-col w-full" id="parent-supervisor-control-center">
+              
+              {/* Parent Quick Tools Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                
+                {/* 1. Support Entry Card */}
+                <SupportEntryCard 
+                  onOpenSupport={() => setShowSupportModal(true)} 
+                  className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 border-b-8 border-sky-400 min-h-[250px]"
+                />
+
+                {/* 2. Backup, Restore & Data Help Center */}
+                <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 border-b-8 border-purple-500 flex flex-col justify-between min-h-[250px]" id="parent-backup-help-container">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-black text-[#1A1C3D] text-lg">Backup e Ajuda do Progresso 💾</h3>
+                        <p className="text-purple-600 text-[11px] font-bold mt-0.5 uppercase tracking-wider">Gestão Local-First do Aluno</p>
+                      </div>
+                      <span className="text-2xl select-none">🛡️</span>
+                    </div>
+
+                    {/* US-08 Help Notice */}
+                    <div className="space-y-1.5 text-slate-500 text-[11px] font-semibold leading-relaxed">
+                      <p className="font-extrabold text-[#1A1C3D] text-xs flex items-center gap-1">
+                        <Info size={12} className="text-purple-500" /> Onde meus dados ficam salvos?
+                      </p>
+                      <p>
+                        Seu progresso, estrelas (XP), vocabulário e selos ficam salvos <strong>somente neste navegador</strong> e aparelho.
+                      </p>
+                      <p>
+                        Se você limpar o cache, usar guia anônima ou trocar de aparelho, os dados não serão sincronizados automaticamente. <strong>Sempre recomendamos exportar o progresso regularmente!</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* US-09 Export/Import Buttons */}
+                  <div className="grid grid-cols-2 gap-4 mt-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        exportAllData();
+                        logTelemetryEvent("progress_exported");
+                      }}
+                      className="py-3 px-4 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 font-black text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer"
+                      id="parent-export-btn"
+                    >
+                      <Clipboard size={14} />
+                      Exportar Progresso
+                    </button>
+                    
+                    <label className="py-3 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-black text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer text-center relative">
+                      <Upload size={14} />
+                      <span>Importar Progresso</span>
+                      <input 
+                        type="file" 
+                        accept=".json"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result;
+                            if (typeof result === "string") {
+                              const res = importAllData(result);
+                              if (res.success) {
+                                logTelemetryEvent("progress_imported");
+                                alert("✓ Progresso e selo restaurados com sucesso! A página será atualizada.");
+                                window.location.reload();
+                              } else {
+                                alert(`❌ Erro ao importar: ${res.error}`);
+                              }
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </label>
+                  </div>
+                </div>
+
               </div>
 
-              <AdminPanel
-                lessons={lessons}
-                onUpdateLessons={handleUpdateLessons}
-                onResetLessons={handleResetLessons}
-              />
+              {/* Original Academic Supervisor AdminPanel */}
+              <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border-b-8 border-rose-500 flex flex-col gap-6 w-full">
+                <div>
+                  <h2 className="text-3xl font-black text-[#1A1C3D]">Supervisor Acadêmico 🛠️</h2>
+                  <p className="text-gray-500 text-sm font-semibold mt-1">
+                    Gerencie o conteúdo didático e as lições disponíveis para os alunos em tempo real sem fazer deploys.
+                  </p>
+                </div>
+
+                <AdminPanel
+                  lessons={lessons}
+                  onUpdateLessons={handleUpdateLessons}
+                  onResetLessons={handleResetLessons}
+                />
+              </div>
+
             </div>
           )}
 
@@ -677,6 +900,200 @@ export default function App() {
         onClose={() => setShowGuide(false)} 
         currentXp={profile.xp} 
       />
+
+      {/* Support / Pix Donation Modal */}
+      <SupportModal
+        isOpen={showSupportModal}
+        onClose={() => {
+          setShowSupportModal(false);
+          syncSupportStatus();
+        }}
+        profile={profile}
+        onBadgeActivated={syncSupportStatus}
+      />
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md">
+          <div className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border-4 border-sky-100 flex flex-col relative animate-scale-up">
+            
+            {/* Header */}
+            <div className="bg-gradient-to-r from-sky-500 to-indigo-600 p-5 text-white flex justify-between items-center relative shrink-0">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-white" />
+                <h3 className="font-black text-lg tracking-tight">Editar Seu Perfil Espacial</h3>
+              </div>
+              <button
+                onClick={() => setShowEditProfile(false)}
+                className="p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto space-y-4 text-slate-700">
+              
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Nome ou Apelido 🧑‍🚀
+                </label>
+                <input
+                  type="text"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value.slice(0, 20))}
+                  placeholder="Seu nome"
+                  className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 focus:border-sky-400 outline-none rounded-xl font-bold text-slate-800 transition-colors text-sm"
+                />
+              </div>
+
+              {/* Age Group / Modo */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Faixa Etária / Modo de Aprendizado 🎒
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditedAgeGroup("kids")}
+                    className={`py-2 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      editedAgeGroup === "kids"
+                        ? "border-sky-400 bg-sky-50 text-sky-700 font-black shadow-sm"
+                        : "border-slate-100 bg-white text-slate-600 hover:border-slate-200"
+                    }`}
+                  >
+                    🧸 Modo Aluno (Kids)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditedAgeGroup("teens")}
+                    className={`py-2 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      editedAgeGroup === "teens"
+                        ? "border-indigo-400 bg-indigo-50 text-indigo-700 font-black shadow-sm"
+                        : "border-slate-100 bg-white text-slate-600 hover:border-slate-200"
+                    }`}
+                  >
+                    ⚡ Modo Jovem (Teen)
+                  </button>
+                </div>
+              </div>
+
+              {/* Emoji selector */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Escolha seu Emoji de Jogador 🌟
+                </label>
+                <div className="grid grid-cols-8 gap-1.5 bg-slate-50 p-2 rounded-2xl border border-slate-100 max-h-[110px] overflow-y-auto">
+                  {[
+                    "🧸", "🦄", "🦖", "🚀", "🦁", "🐼", "🍦", "🌈",
+                    "🎮", "😎", "🎧", "🛹", "⚡", "👾", "💻", "🤘"
+                  ].map((emoji) => {
+                    const isSelected = editedEmoji === emoji;
+                    return (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setEditedEmoji(emoji)}
+                        className={`w-9 h-9 text-xl rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-sky-400 text-white scale-110 shadow-sm"
+                            : "bg-white hover:bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Secret Password */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                  Sua Senha Secreta 🔒
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditedPassword ? "text" : "password"}
+                    value={editedPassword}
+                    onChange={(e) => setEditedPassword(e.target.value.slice(0, 15))}
+                    placeholder="Sua senha secreta"
+                    className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border-2 border-slate-200 focus:border-sky-400 outline-none rounded-xl font-bold text-slate-800 transition-colors text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditedPassword(!showEditedPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showEditedPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Guarde esta senha! Ela protege o acesso ao seu perfil no aparelho.
+                </p>
+              </div>
+
+              {editError && (
+                <div className="text-xs text-red-500 font-extrabold flex items-center gap-1.5 bg-red-50 p-2.5 rounded-lg border border-red-100">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {editError}
+                </div>
+              )}
+
+              {editSuccess && (
+                <div className="text-xs text-emerald-600 font-extrabold flex items-center gap-1.5 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" /> Perfil atualizado com sucesso! 🚀
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowEditProfile(false)}
+                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!editedName.trim()) {
+                    setEditError("O nome não pode ficar vazio!");
+                    return;
+                  }
+                  if (!editedPassword.trim()) {
+                    setEditError("Você precisa definir uma senha secreta!");
+                    return;
+                  }
+                  
+                  // Save updated profile
+                  saveProfile({
+                    ...profile,
+                    displayName: editedName.trim(),
+                    profileEmoji: editedEmoji,
+                    ageGroup: editedAgeGroup,
+                    password: editedPassword.trim()
+                  });
+
+                  setEditError("");
+                  setEditSuccess(true);
+                  setTimeout(() => {
+                    setShowEditProfile(false);
+                    setEditSuccess(false);
+                  }, 800);
+                }}
+                className="flex-1 py-2.5 bg-sky-400 hover:bg-sky-500 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-sky-100 cursor-pointer"
+              >
+                Salvar Alterações <Save className="w-4 h-4" />
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
