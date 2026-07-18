@@ -1,0 +1,30 @@
+{
+  "short_name": "SpaceAcademy",
+  "name": "SpaceAcademy - Aprenda Inglês com IA",
+  "description": "Plataforma de aprendizado de inglês lúdica, interativa e segura para crianças e adolescentes.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1A1C3D",
+  "theme_color": "#1A1C3D",
+  "display": "standalone",
+  "orientation": "portrait-primary"
+}
