@@ -17,12 +17,17 @@ import { getLevelAndProgress, getLevelTitle } from "./utils/levels";
 import { 
   Sparkles, BookOpen, MessageSquare, Flame, LogOut, 
   Settings, PenTool, Home, Star, Play, Lock, CheckCircle2, Award,
-  Edit3, Key, X, Check, Save, User, Eye, EyeOff, AlertCircle, Heart, Info, Clipboard, Upload
+  Edit3, Key, X, Check, Save, User, Eye, EyeOff, AlertCircle, Heart, Info, Clipboard, Upload,
+  ShoppingBag
 } from "lucide-react";
 import SupportModal from "./components/support/SupportModal";
 import SupporterBadge from "./components/support/SupporterBadge";
 import SupportEntryCard from "./components/support/SupportEntryCard";
+import SpaceShopModal from "./components/support/SpaceShopModal";
+import SpaceShopCard from "./components/support/SpaceShopCard";
 import { isSupporterActive, exportAllData, importAllData } from "./services/supportStorage";
+import { getUnlockedEmojis } from "./services/shopStorage";
+import { ShopItem } from "./types/shop";
 import { logTelemetryEvent } from "./services/telemetryService";
 
 export default function App() {
@@ -36,7 +41,7 @@ export default function App() {
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
   
   // App visual states
-  const [activeTab, setActiveTab] = useState<"trilha" | "vocabulario" | "tutor" | "escrita" | "admin">("trilha");
+  const [activeTab, setActiveTab] = useState<"trilha" | "vocabulario" | "tutor" | "escrita" | "loja" | "admin">("trilha");
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -44,6 +49,10 @@ export default function App() {
   // Support / Pix Modal state
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supporterActive, setSupporterActive] = useState(false);
+
+  // Space Shop Modal state
+  const [selectedShopItem, setSelectedShopItem] = useState<ShopItem | null>(null);
+  const [showShopModal, setShowShopModal] = useState(false);
 
   // State to force re-render components that check supporter status
   const syncSupportStatus = () => {
@@ -787,6 +796,16 @@ export default function App() {
 
               </div>
 
+              {/* Space Shop Card for Gamified Purchases (Emojis & Levels) */}
+              <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border-b-8 border-indigo-500 w-full">
+                <SpaceShopCard
+                  onSelectItem={(shopItem) => {
+                    setSelectedShopItem(shopItem);
+                    setShowShopModal(true);
+                  }}
+                />
+              </div>
+
               {/* Original Academic Supervisor AdminPanel */}
               <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border-b-8 border-rose-500 flex flex-col gap-6 w-full">
                 <div>
@@ -803,6 +822,34 @@ export default function App() {
                 />
               </div>
 
+            </div>
+          )}
+
+          {/* TAB 6: Space Shop */}
+          {activeTab === "loja" && (
+            <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border-b-8 border-indigo-500 flex flex-col gap-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100/50">
+                <div>
+                  <h2 className="text-3xl font-black text-indigo-950 flex items-center gap-2">Loja Cósmica 🪐</h2>
+                  <p className="text-gray-500 text-sm font-semibold mt-1">
+                    Turbine seu aprendizado com itens exclusivos de customização e boosts de nível!
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfile(true)}
+                  className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer self-start md:self-auto"
+                >
+                  ⚙️ Usar Meus Emojis
+                </button>
+              </div>
+
+              <SpaceShopCard
+                onSelectItem={(shopItem) => {
+                  setSelectedShopItem(shopItem);
+                  setShowShopModal(true);
+                }}
+              />
             </div>
           )}
 
@@ -824,7 +871,7 @@ export default function App() {
 
       {/* Navigation Tab Bar / Responsive Header bottom menu */}
       <nav className="relative z-20 bg-white/95 backdrop-blur-md border-t-2 border-slate-100 py-4 px-6 shadow-xl sticky bottom-0">
-        <div className="w-full max-w-lg mx-auto flex items-center justify-between text-slate-400">
+        <div className="w-full max-w-xl mx-auto flex items-center justify-between text-slate-400">
           
           {/* Trilha 🗺️ */}
           <button
@@ -878,6 +925,27 @@ export default function App() {
             <span className="text-[10px] font-black">Escrita ✍️</span>
           </button>
 
+          {/* Loja Cósmica 🪐 */}
+          <button
+            type="button"
+            id="tab-loja"
+            onClick={() => {
+              setActiveTab("loja");
+              logTelemetryEvent("shop_tab_clicked");
+            }}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer relative ${
+              activeTab === "loja" 
+                ? "text-indigo-600 scale-105" 
+                : "text-indigo-400 hover:text-indigo-600 animate-pulse"
+            }`}
+          >
+            <ShoppingBag className="w-6 h-6 stroke-[2.5px]" />
+            <span className="text-[10px] font-black">Loja 🪐</span>
+            {activeTab !== "loja" && (
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping" />
+            )}
+          </button>
+
           {/* Supervisor Admin 🛠️ */}
           <button
             type="button"
@@ -910,6 +978,20 @@ export default function App() {
         }}
         profile={profile}
         onBadgeActivated={syncSupportStatus}
+      />
+
+      {/* Space Shop Gamification Modal */}
+      <SpaceShopModal
+        isOpen={showShopModal}
+        onClose={() => {
+          setShowShopModal(false);
+          setSelectedShopItem(null);
+        }}
+        item={selectedShopItem}
+        profile={profile}
+        onProfileUpdate={(updatedProfile) => {
+          saveProfile(updatedProfile);
+        }}
       />
 
       {/* Edit Profile Modal */}
@@ -985,26 +1067,37 @@ export default function App() {
                   Escolha seu Emoji de Jogador 🌟
                 </label>
                 <div className="grid grid-cols-8 gap-1.5 bg-slate-50 p-2 rounded-2xl border border-slate-100 max-h-[110px] overflow-y-auto">
-                  {[
-                    "🧸", "🦄", "🦖", "🚀", "🦁", "🐼", "🍦", "🌈",
-                    "🎮", "😎", "🎧", "🛹", "⚡", "👾", "💻", "🤘"
-                  ].map((emoji) => {
-                    const isSelected = editedEmoji === emoji;
-                    return (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => setEditedEmoji(emoji)}
-                        className={`w-9 h-9 text-xl rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-sky-400 text-white scale-110 shadow-sm"
-                            : "bg-white hover:bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    const defaultEmojis = [
+                      "🧸", "🦄", "🦖", "🚀", "🦁", "🐼", "🍦", "🌈",
+                      "🎮", "😎", "🎧", "🛹", "⚡", "👾", "💻", "🤘"
+                    ];
+                    const unlocked = getUnlockedEmojis();
+                    const combined = Array.from(new Set([...defaultEmojis, ...unlocked]));
+                    return combined.map((emoji) => {
+                      const isSelected = editedEmoji === emoji;
+                      const isPremium = unlocked.includes(emoji);
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setEditedEmoji(emoji)}
+                          className={`w-9 h-9 text-xl rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
+                            isSelected
+                              ? "bg-sky-400 text-white scale-110 shadow-sm"
+                              : "bg-white hover:bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {emoji}
+                          {isPremium && (
+                            <span className="absolute -top-1 -right-1 text-[8px] bg-amber-400 text-amber-950 font-black rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-xs select-none">
+                              ⭐
+                            </span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 

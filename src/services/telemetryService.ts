@@ -1,16 +1,4 @@
-export type LocalEventName =
-  | "support_opened"
-  | "support_amount_selected"
-  | "pix_code_copied"
-  | "receipt_code_submitted"
-  | "receipt_code_rejected"
-  | "receipt_code_reused"
-  | "support_badge_activated"
-  | "support_badge_shared"
-  | "app_invite_clicked"
-  | "app_invite_shared"
-  | "progress_exported"
-  | "progress_imported";
+export type LocalEventName = string;
 
 export interface TelemetryEvent {
   eventName: LocalEventName;
