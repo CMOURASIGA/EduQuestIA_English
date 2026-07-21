@@ -308,6 +308,12 @@ export default function App() {
           profile={profile}
           onClose={() => setActiveLessonId(null)}
           onComplete={handleCompleteActiveLesson}
+          onIncorrectAnswer={() => {
+            if (profile) {
+              const newXp = Math.max(0, profile.xp - 10);
+              saveProfile({ ...profile, xp: newXp });
+            }
+          }}
         />
       );
     }

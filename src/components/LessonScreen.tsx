@@ -8,6 +8,7 @@ interface LessonScreenProps {
   profile: UserProfile;
   onClose: () => void;
   onComplete: (xpEarned: number, wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
+  onIncorrectAnswer?: () => void;
 }
 
 const AVATARS: Record<AvatarType, { name: string; icon: string }> = {
@@ -27,7 +28,7 @@ const speakEnglish = (text: string) => {
   }
 };
 
-export default function LessonScreen({ lesson, profile, onClose, onComplete }: LessonScreenProps) {
+export default function LessonScreen({ lesson, profile, onClose, onComplete, onIncorrectAnswer }: LessonScreenProps) {
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [scrambledSelected, setScrambledSelected] = useState<string[]>([]);
@@ -126,6 +127,9 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete }: L
       setAiFeedback(data);
       setIsAnswerCorrect(data.isCorrect);
       setHasChecked(true);
+      if (!data.isCorrect && onIncorrectAnswer) {
+        onIncorrectAnswer();
+      }
     } catch (err) {
       console.error(err);
       // Fallback in case of server failure (P1 compliance)
@@ -163,6 +167,10 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete }: L
 
     setIsAnswerCorrect(correct);
     setHasChecked(true);
+
+    if (!correct && onIncorrectAnswer) {
+      onIncorrectAnswer();
+    }
 
     if (exercise.audioText && correct) {
       speakEnglish(exercise.audioText);
@@ -620,11 +628,18 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete }: L
                       <X className="w-6 h-6 stroke-[3px]" />
                     </div>
                     <div>
-                      <h4 className="font-black text-red-800 text-base leading-tight">Ops! Quase lá!</h4>
+                      <h4 className="font-black text-red-800 text-base leading-tight">Ops! Resposta incorreta!</h4>
                       <p className="text-red-700 text-xs font-semibold mt-0.5">
                         {exercise.type !== "writing-challenge" && (
-                          <span>Gabarito correto: <span className="font-bold underline">{Array.isArray(exercise.correctAnswer) ? exercise.correctAnswer.join(", ") : exercise.correctAnswer}</span></span>
+                          <span>Gabarito correto: <span className="font-bold underline">
+                            {exercise.type === "match-pairs" 
+                              ? exercise.leftPairs?.map((left, idx) => `${left} = ${exercise.rightPairs![idx]}`).join(" | ")
+                              : Array.isArray(exercise.correctAnswer) ? exercise.correctAnswer.join(", ") : exercise.correctAnswer}
+                          </span></span>
                         )}
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-800 border border-red-200">
+                          -10 XP
+                        </span>
                       </p>
                     </div>
                   </>
