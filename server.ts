@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import tutorHandler from "./api/tutor";
 import writingFeedbackHandler from "./api/writing-feedback";
+import missionsHandler from "./api/missions";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ async function startServer() {
   // The same handlers are used by Vercel in production and by Express locally.
   app.post("/api/tutor", (req, res) => void tutorHandler(req, res));
   app.post("/api/writing-feedback", (req, res) => void writingFeedbackHandler(req, res));
+  app.post("/api/missions", (req, res) => void missionsHandler(req, res));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
