@@ -164,6 +164,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       avatar,
       profileEmoji: selectedEmoji,
       ageGroup,
+      age: parseInt(age, 10),
       goal,
       dailyMinutes,
       xp: initialXp,
