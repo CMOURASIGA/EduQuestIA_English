@@ -7,6 +7,8 @@ export interface UserProfile {
   avatar: AvatarType;
   profileEmoji: string;
   ageGroup: AgeGroupType;
+  /** Age is used only to calibrate the learning missions. */
+  age?: number;
   goal: string;
   dailyMinutes: number;
   xp: number;
