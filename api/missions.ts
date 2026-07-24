@@ -1,4 +1,4 @@
-import { generateOpenAIText, parseJsonResponse } from "./_openai.js";
+import { generateOpenAIText, getAIDiagnostic, parseJsonResponse, OpenAIDiagnosticError } from "./_openai.js";
 
 const allowedTypes = new Set(["multiple-choice", "arrange-words", "fill-blank", "match-pairs", "writing-challenge"]);
 
@@ -17,15 +17,15 @@ function normalizeLesson(raw: any, suffix: string) {
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "A criação de missões por IA ainda não foi configurada." });
   const { age, ageGroup, userLevel = 1, goal, previousLessonTitle, completedLessonTitles = [] } = req.body || {};
   if (!Number.isFinite(Number(age)) || !["kids", "teens"].includes(ageGroup)) return res.status(400).json({ error: "Perfil do aluno inválido para criar a missão." });
   const audience = ageGroup === "kids" ? "criança, com frases muito curtas e temas seguros como animais, espaço, brincadeiras e família" : "pré-adolescente ou adolescente, com temas seguros como games, música, esportes, amizade, viagens e tecnologia";
   try {
     const text = await generateOpenAIText({ temperature: 0.7, instructions: `Você cria uma única missão de inglês para uma ${audience}, com ${age} anos e nível interno ${userLevel}. Ensine algo novo, sem repetir tema ou palavras centrais das missões concluídas. Não use temas adultos, violência, namoro, dados pessoais ou conteúdo inadequado. Crie 3 a 5 exercícios objetivos, no máximo um writing-challenge. Retorne APENAS JSON: {"lesson":{"id":"slug","unitId":"adaptive","unitTitle":"texto","title":"texto","description":"texto em português","icon":"emoji","xpReward":80,"exercises":[{"id":"ex-1","type":"multiple-choice","prompt":"...","options":["..."],"correctAnswer":"...","translationContext":"..."}]}}. Para fill-blank, multiple-choice e arrange-words inclua options e correctAnswer. Para match-pairs inclua leftPairs e rightPairs. Para writing-challenge inclua writingPrompt em inglês e correctAnswer vazio.`, input: `Objetivo: ${typeof goal === "string" ? goal : "aprender inglês"}\nMissão concluída: ${typeof previousLessonTitle === "string" ? previousLessonTitle : "não informada"}\nNão repetir: ${Array.isArray(completedLessonTitles) ? completedLessonTitles.join(" | ") : "nenhuma"}` });
     return res.status(200).json({ lesson: normalizeLesson(parseJsonResponse(text), Date.now().toString(36)) });
-  } catch (error) {
-    console.error("Erro ao criar missão por IA:", error);
-    return res.status(500).json({ error: "Não foi possível criar uma nova missão agora." });
+  } catch (error: unknown) {
+    const diagnostic = getAIDiagnostic(error);
+    console.error(`[${diagnostic.requestId}] Erro ao criar missão por IA:`, error);
+    return res.status(error instanceof OpenAIDiagnosticError ? error.status : 500).json({ error: `${diagnostic.message} Código: ${diagnostic.code}. Rastreio: ${diagnostic.requestId}.`, diagnostic });
   }
 }
