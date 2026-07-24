@@ -227,7 +227,7 @@ export default function App() {
   };
 
   // Handle lesson completion rewards
-  const handleCompleteActiveLesson = (wordsLearned: any[]) => {
+  const handleCompleteActiveLesson = (wordsLearned: any[], continueToLessonId?: string) => {
     if (!profile || !activeLessonId) return;
 
     // Check if first completion to add streak
@@ -271,8 +271,13 @@ export default function App() {
     setVocabulary(updatedVocab);
     localStorage.setItem("playenglish_vocabulary", JSON.stringify(updatedVocab));
     saveProfile(updatedProfile);
-    setActiveLessonId(null); // exit lesson screen
-    setActiveTab("trilha"); // return to trail
+    if (continueToLessonId) {
+      setActiveLessonId(continueToLessonId);
+      return;
+    }
+
+    setActiveLessonId(null);
+    setActiveTab("trilha");
   };
 
   // Award XP for standalone features (like writing challenges)
@@ -301,6 +306,12 @@ export default function App() {
   if (activeLessonId) {
     const activeLessonObj = lessons.find((l) => l.id === activeLessonId);
     if (activeLessonObj) {
+      const activeLessonIndex = lessons.findIndex((l) => l.id === activeLessonId);
+      // After the final mission, restart the trail so the player may keep practicing
+      // and earning XP instead of reaching a dead end.
+      const nextLesson = lessons.length > 0
+        ? lessons[(activeLessonIndex + 1) % lessons.length]
+        : null;
       return (
         <LessonScreen
           lesson={activeLessonObj}
@@ -308,6 +319,8 @@ export default function App() {
           onClose={() => setActiveLessonId(null)}
           onComplete={handleCompleteActiveLesson}
           onAwardXp={handleAwardXp}
+          nextLesson={nextLesson}
+          onContinueToNextLesson={(wordsLearned) => handleCompleteActiveLesson(wordsLearned, nextLesson?.id)}
         />
       );
     }
