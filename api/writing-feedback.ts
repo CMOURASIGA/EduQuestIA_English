@@ -1,4 +1,4 @@
-import { generateOpenAIText, parseJsonResponse } from "./_openai";
+import { generateOpenAIText, parseJsonResponse } from "./_openai.js";
 
 function criteriaForLevel(level: number): string {
   if (level <= 2) return "Avalie com acolhimento, mas sem marcar uma frase incorreta como correta. Considere correta apenas uma frase compreensível, em inglês e alinhada ao desafio. Pequenos erros de digitação podem ser aceitos somente se não mudarem o sentido.";

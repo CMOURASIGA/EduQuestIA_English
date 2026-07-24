@@ -1,4 +1,4 @@
-import { generateOpenAIText, parseJsonResponse } from "./_openai";
+import { generateOpenAIText, parseJsonResponse } from "./_openai.js";
 
 const allowedTypes = new Set(["multiple-choice", "arrange-words", "fill-blank", "match-pairs", "writing-challenge"]);
 

@@ -56,6 +56,7 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
   const [earnedXp, setEarnedXp] = useState(0);
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [continuingJourney, setContinuingJourney] = useState(false);
+  const [journeyError, setJourneyError] = useState<string | null>(null);
   const previousLevel = useRef(getLevelAndProgress(profile.xp).level);
 
   const exercise: Exercise = lesson.exercises[currentIdx];
@@ -237,7 +238,14 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
       return;
     }
     setContinuingJourney(true);
-    try { await onContinueToNextLesson(newWords); } finally { setContinuingJourney(false); }
+    setJourneyError(null);
+    try {
+      await onContinueToNextLesson(newWords);
+    } catch (error: any) {
+      setJourneyError(error?.message || "Não foi possível criar sua próxima missão agora. Tente novamente.");
+    } finally {
+      setContinuingJourney(false);
+    }
   };
 
   const progressPercent = ((currentIdx) / lesson.exercises.length) * 100;
@@ -634,6 +642,11 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
             >
               {continuingJourney ? <>Preparando sua próxima missão... <Sparkles className="w-5 h-5" /></> : nextLesson ? <>Próxima missão: {nextLesson.title} <Play className="w-5 h-5 fill-current" /></> : <>Criar próxima missão <Sparkles className="w-5 h-5" /></>}
             </button>
+            {journeyError && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
+                {journeyError}
+              </p>
+            )}
             <button
               type="button"
               id="lesson-summary-home"

@@ -30,16 +30,6 @@ import { getUnlockedEmojis } from "./services/shopStorage";
 import { ShopItem } from "./types/shop";
 import { logTelemetryEvent } from "./services/telemetryService";
 
-const fallbackMission = (profile: UserProfile, missionNumber: number): Lesson => {
-  const isKids = profile.ageGroup === "kids";
-  const id = `practice-${Date.now()}-${missionNumber}`;
-  return { id, unitId: "adaptive-practice", unitTitle: `Missões adaptativas · Nível ${getLevelAndProgress(profile.xp).level}`, title: `${isKids ? "Aventura dos Animais" : "Missão: Rotina e Hobbies"} ${missionNumber}`, description: "Uma missão de prática criada para você continuar aprendendo enquanto a central de missões se conecta.", icon: isKids ? "🐾" : "🎮", xpReward: 60, exercises: [
-    { id: `${id}-1`, type: "multiple-choice", prompt: "Qual palavra em inglês combina com a missão?", options: isKids ? ["Cat", "Table", "Blue"] : ["Play", "Yellow", "Chair"], correctAnswer: isKids ? "Cat" : "Play", translationContext: "Leia as opções e escolha a palavra que faz sentido." },
-    { id: `${id}-2`, type: "fill-blank", prompt: isKids ? "Complete: 'I like my ___.'" : "Complete: 'I ___ video games.'", options: isKids ? ["cat", "red", "run"] : ["play", "blue", "dog"], correctAnswer: isKids ? "cat" : "play", translationContext: "Pense na palavra que completa a frase." },
-    { id: `${id}-3`, type: "writing-challenge", prompt: `Escreva uma frase simples em inglês sobre seu ${isKids ? "animal favorito" : "hobby favorito"}.`, writingPrompt: `Write one simple, correct English sentence about your ${isKids ? "favorite animal" : "favorite hobby"}.`, correctAnswer: "", translationContext: "Escreva uma frase curta. A IA vai corrigir e explicar." }
-  ] };
-};
-
 export default function App() {
   // Core Profile state
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -237,7 +227,7 @@ export default function App() {
   };
 
   // Handle lesson completion rewards
-  const handleCompleteActiveLesson = (wordsLearned: any[], continueToLessonId?: string) => {
+  const recordLessonCompletion = (wordsLearned: any[]) => {
     if (!profile || !activeLessonId) return;
 
     // Check if first completion to add streak
@@ -279,13 +269,12 @@ export default function App() {
     };
 
     setVocabulary(updatedVocab);
-    localStorage.setItem("playenglish_vocabulary", JSON.stringify(updatedVocab));
+    localStorage.setItem(`playenglish_vocabulary_${profile.id}`, JSON.stringify(updatedVocab));
     saveProfile(updatedProfile);
-    if (continueToLessonId) {
-      setActiveLessonId(continueToLessonId);
-      return;
-    }
+  };
 
+  const handleCompleteActiveLesson = (wordsLearned: any[]) => {
+    recordLessonCompletion(wordsLearned);
     setActiveLessonId(null);
     setActiveTab("trilha");
   };
@@ -311,15 +300,19 @@ export default function App() {
       if (!response.ok || !data.lesson || !Array.isArray(data.lesson.exercises)) throw new Error(data.error || "Não foi possível criar a próxima missão.");
       return data.lesson as Lesson;
     } catch (error) {
-      console.warn("Missão por IA indisponível; usando missão de prática local.", error);
-      return fallbackMission(profile, lessons.length + 1);
+      console.error("Missão por IA indisponível.", error);
+      throw new Error("Não foi possível criar sua nova missão com a IA. Tente novamente em instantes.");
     }
   };
 
-  const handleContinueJourney = async (wordsLearned: any[], currentLesson: Lesson, nextLesson: Lesson | null) => {
-    if (nextLesson) { handleCompleteActiveLesson(wordsLearned, nextLesson.id); return; }
-    handleCompleteActiveLesson(wordsLearned);
+  const handleContinueJourney = async (wordsLearned: any[], currentLesson: Lesson) => {
+    // Every new step in the journey is created for the student's current
+    // profile. The starter lessons remain visible on the map, but must not
+    // force the student into a fixed sequence after finishing a mission.
     const generatedLesson = await createNextMission(currentLesson);
+    // A missão só é registrada e aberta quando a IA devolve uma estrutura válida.
+    // Assim, não existe avanço automático nem uma missão local apresentada como IA.
+    recordLessonCompletion(wordsLearned);
     handleUpdateLessons([...lessons, generatedLesson]);
     setActiveLessonId(generatedLesson.id);
   };
@@ -341,18 +334,18 @@ export default function App() {
   if (activeLessonId) {
     const activeLessonObj = lessons.find((l) => l.id === activeLessonId);
     if (activeLessonObj) {
-      const activeLessonIndex = lessons.findIndex((l) => l.id === activeLessonId);
-      const nextLesson = activeLessonIndex >= 0 && activeLessonIndex + 1 < lessons.length ? lessons[activeLessonIndex + 1] : null;
       return (
-        <LessonScreen
-          lesson={activeLessonObj}
-          profile={profile}
-          onClose={() => setActiveLessonId(null)}
-          onComplete={handleCompleteActiveLesson}
-          onAwardXp={handleAwardXp}
-          nextLesson={nextLesson}
-          onContinueToNextLesson={(wordsLearned) => handleContinueJourney(wordsLearned, activeLessonObj, nextLesson)}
-        />
+        <React.Fragment key={activeLessonObj.id}>
+          <LessonScreen
+            lesson={activeLessonObj}
+            profile={profile}
+            onClose={() => setActiveLessonId(null)}
+            onComplete={handleCompleteActiveLesson}
+            onAwardXp={handleAwardXp}
+            nextLesson={null}
+            onContinueToNextLesson={(wordsLearned) => handleContinueJourney(wordsLearned, activeLessonObj)}
+          />
+        </React.Fragment>
       );
     }
   }

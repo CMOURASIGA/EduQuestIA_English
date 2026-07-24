@@ -1,4 +1,4 @@
-import { generateOpenAIText } from "./_openai";
+import { generateOpenAIText } from "./_openai.js";
 
 function difficultyForLevel(userLevel: number): string {
   if (userLevel <= 2) return "Use inglês muito simples, frases curtas e bastante português para orientar. Faça perguntas fáceis de sim/não ou escolha.";
