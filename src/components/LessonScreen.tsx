@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { Lesson, Exercise, UserProfile, AvatarType } from "../types";
-import { ArrowLeft, Volume2, Check, X, Sparkles, AlertCircle, HelpCircle, Star, Send } from "lucide-react";
+import { ArrowLeft, Volume2, Check, X, Sparkles, AlertCircle, HelpCircle, Star, Send, Play } from "lucide-react";
 import { getLevelAndProgress, getLevelTitle } from "../utils/levels";
 
 interface LessonScreenProps {
@@ -10,6 +10,8 @@ interface LessonScreenProps {
   onClose: () => void;
   onComplete: (wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
   onAwardXp: (xp: number) => void;
+  nextLesson?: Lesson | null;
+  onContinueToNextLesson?: (wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
 }
 
 const AVATARS: Record<AvatarType, { name: string; icon: string }> = {
@@ -29,7 +31,7 @@ const speakEnglish = (text: string) => {
   }
 };
 
-export default function LessonScreen({ lesson, profile, onClose, onComplete, onAwardXp }: LessonScreenProps) {
+export default function LessonScreen({ lesson, profile, onClose, onComplete, onAwardXp, nextLesson, onContinueToNextLesson }: LessonScreenProps) {
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [scrambledSelected, setScrambledSelected] = useState<string[]>([]);
@@ -226,6 +228,14 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
 
   const handleFinishLesson = () => {
     onComplete(newWords);
+  };
+
+  const handleContinueJourney = () => {
+    if (onContinueToNextLesson) {
+      onContinueToNextLesson(newWords);
+      return;
+    }
+    handleFinishLesson();
   };
 
   const progressPercent = ((currentIdx) / lesson.exercises.length) * 100;
@@ -612,14 +622,24 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
             </div>
           </div>
 
-          <button
-            type="button"
-            id="lesson-summary-continue"
-            onClick={handleFinishLesson}
-            className="w-full max-w-sm py-4 bg-emerald-400 hover:bg-emerald-500 text-white font-black rounded-2xl text-lg flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-98 transition-all"
-          >
-            Voltar para a Home <Sparkles className="w-5 h-5 animate-spin" />
-          </button>
+          <div className="w-full max-w-sm space-y-3">
+            <button
+              type="button"
+              id="lesson-summary-continue"
+              onClick={handleContinueJourney}
+              className="w-full py-4 bg-emerald-400 hover:bg-emerald-500 text-white font-black rounded-2xl text-lg flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-98 transition-all"
+            >
+              {nextLesson ? <>Próxima missão: {nextLesson.title} <Play className="w-5 h-5 fill-current" /></> : <>Jogar outra missão <Play className="w-5 h-5 fill-current" /></>}
+            </button>
+            <button
+              type="button"
+              id="lesson-summary-home"
+              onClick={handleFinishLesson}
+              className="w-full py-3 text-slate-500 hover:text-slate-700 font-black rounded-2xl text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+            >
+              Ver mapa de missões <Sparkles className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
