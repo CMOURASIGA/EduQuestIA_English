@@ -301,7 +301,7 @@ export default function App() {
       return data.lesson as Lesson;
     } catch (error) {
       console.error("Missão por IA indisponível.", error);
-      throw new Error("Não foi possível criar sua nova missão com a IA. Tente novamente em instantes.");
+      throw error instanceof Error ? error : new Error("Não foi possível criar sua nova missão com a IA.");
     }
   };
 
