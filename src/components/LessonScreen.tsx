@@ -152,11 +152,12 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
       }
     } catch (err) {
       console.error(err);
+      const diagnosticMessage = err instanceof Error ? err.message : "Não foi possível avaliar a resposta.";
       // A failed correction must never be presented as a correct answer.
       setAiFeedback({
         isCorrect: false,
         celebration: "Ainda não consegui corrigir sua frase agora.",
-        corrections: ["O corretor de IA está indisponível. Tente novamente em alguns instantes para receber a correção de verdade."],
+        corrections: [diagnosticMessage],
         improvedVersion: writingInput,
         explanation: "Nenhum XP foi concedido sem uma avaliação válida."
       });
