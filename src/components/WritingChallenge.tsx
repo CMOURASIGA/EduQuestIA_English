@@ -98,11 +98,12 @@ export default function WritingChallenge({ profile, onXpEarned }: WritingChallen
       }
     } catch (err: any) {
       console.error(err);
+      const diagnosticMessage = err instanceof Error ? err.message : "Não foi possível avaliar a resposta.";
       // Never reward an answer that was not evaluated.
       setFeedback({
         isCorrect: false,
         celebration: "Não consegui avaliar sua frase agora.",
-        corrections: ["O corretor de IA está indisponível. Tente novamente para receber uma correção real."],
+        corrections: [diagnosticMessage],
         improvedVersion: inputText,
         explanation: "Nenhum XP foi concedido porque a resposta não pôde ser validada."
       });
