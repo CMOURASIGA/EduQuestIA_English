@@ -11,7 +11,7 @@ interface LessonScreenProps {
   onComplete: (wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
   onAwardXp: (xp: number) => void;
   nextLesson?: Lesson | null;
-  onContinueToNextLesson?: (wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
+  onContinueToNextLesson?: (wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => Promise<void> | void;
 }
 
 const AVATARS: Record<AvatarType, { name: string; icon: string }> = {
@@ -55,6 +55,7 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
   const [newWords, setNewWords] = useState<any[]>([]);
   const [earnedXp, setEarnedXp] = useState(0);
   const [levelUp, setLevelUp] = useState<number | null>(null);
+  const [continuingJourney, setContinuingJourney] = useState(false);
   const previousLevel = useRef(getLevelAndProgress(profile.xp).level);
 
   const exercise: Exercise = lesson.exercises[currentIdx];
@@ -230,12 +231,13 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
     onComplete(newWords);
   };
 
-  const handleContinueJourney = () => {
-    if (onContinueToNextLesson) {
-      onContinueToNextLesson(newWords);
+  const handleContinueJourney = async () => {
+    if (!onContinueToNextLesson || continuingJourney) {
+      if (!onContinueToNextLesson) handleFinishLesson();
       return;
     }
-    handleFinishLesson();
+    setContinuingJourney(true);
+    try { await onContinueToNextLesson(newWords); } finally { setContinuingJourney(false); }
   };
 
   const progressPercent = ((currentIdx) / lesson.exercises.length) * 100;
@@ -627,9 +629,10 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
               type="button"
               id="lesson-summary-continue"
               onClick={handleContinueJourney}
+              disabled={continuingJourney}
               className="w-full py-4 bg-emerald-400 hover:bg-emerald-500 text-white font-black rounded-2xl text-lg flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-98 transition-all"
             >
-              {nextLesson ? <>Próxima missão: {nextLesson.title} <Play className="w-5 h-5 fill-current" /></> : <>Jogar outra missão <Play className="w-5 h-5 fill-current" /></>}
+              {continuingJourney ? <>Preparando sua próxima missão... <Sparkles className="w-5 h-5" /></> : nextLesson ? <>Próxima missão: {nextLesson.title} <Play className="w-5 h-5 fill-current" /></> : <>Criar próxima missão <Sparkles className="w-5 h-5" /></>}
             </button>
             <button
               type="button"
