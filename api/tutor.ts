@@ -1,4 +1,4 @@
-import { generateOpenAIText } from "./_openai.js";
+import { generateOpenAIText, getAIDiagnostic, OpenAIDiagnosticError } from "./_openai.js";
 
 function difficultyForLevel(userLevel: number): string {
   if (userLevel <= 2) return "Use inglês muito simples, frases curtas e bastante português para orientar. Faça perguntas fáceis de sim/não ou escolha.";
@@ -10,8 +10,6 @@ function difficultyForLevel(userLevel: number): string {
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "O tutor de IA ainda não foi configurado. Adicione OPENAI_API_KEY nas variáveis do servidor." });
-
   const { message, history, avatar, ageGroup, childName, userLevel = 1 } = req.body || {};
   if (typeof message !== "string" || !message.trim()) return res.status(400).json({ error: "Envie uma mensagem para o tutor." });
 
@@ -43,8 +41,9 @@ Regras obrigatórias:
       temperature: 0.6,
     });
     return res.status(200).json({ reply });
-  } catch (error) {
-    console.error("Erro no tutor de IA:", error);
-    return res.status(500).json({ error: "Não foi possível responder agora. Tente novamente em instantes." });
+  } catch (error: unknown) {
+    const diagnostic = getAIDiagnostic(error);
+    console.error(`[${diagnostic.requestId}] Erro no tutor de IA:`, error);
+    return res.status(error instanceof OpenAIDiagnosticError ? error.status : 500).json({ error: `${diagnostic.message} Código: ${diagnostic.code}. Rastreio: ${diagnostic.requestId}.`, diagnostic });
   }
 }
