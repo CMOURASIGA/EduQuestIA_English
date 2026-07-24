@@ -84,9 +84,12 @@ export default function WritingChallenge({ profile, onXpEarned }: WritingChallen
       });
 
       const data = await res.json();
+      if (!res.ok || typeof data.isCorrect !== "boolean") {
+        throw new Error(data.error || "Não foi possível avaliar a resposta.");
+      }
       setFeedback(data);
 
-      if (res.ok) {
+      if (data.isCorrect === true) {
         if (!completedList.includes(selectedId)) {
           setCompletedList([...completedList, selectedId]);
           // Award 40 XP bônus for writing challenge!
@@ -95,13 +98,13 @@ export default function WritingChallenge({ profile, onXpEarned }: WritingChallen
       }
     } catch (err: any) {
       console.error(err);
-      // Friendly fallback
+      // Never reward an answer that was not evaluated.
       setFeedback({
-        isCorrect: true,
-        celebration: "Sensacional! 🎉 Sua frase foi processada pelo nosso corretor de inglês!",
-        corrections: [],
+        isCorrect: false,
+        celebration: "Não consegui avaliar sua frase agora.",
+        corrections: ["O corretor de IA está indisponível. Tente novamente para receber uma correção real."],
         improvedVersion: inputText,
-        explanation: "Infelizmente, o robô de IA está descansando agora, mas seu esforço em escrever inglês é nota 10!"
+        explanation: "Nenhum XP foi concedido porque a resposta não pôde ser validada."
       });
     } finally {
       setLoading(false);

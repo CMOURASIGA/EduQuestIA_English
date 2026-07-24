@@ -3,6 +3,6 @@
   "description": "Plataforma de aprendizado de inglês lúdica, interativa e segura para crianças e adolescentes de até 15 anos, com lições divertidas, gamificação e tutor de IA.",
   "requestFramePermissions": [],
   "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+    "MAJOR_CAPABILITY_SERVER_SIDE_OPENAI_API"
   ]
 }

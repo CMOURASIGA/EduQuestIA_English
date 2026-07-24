@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { Lesson, Exercise, UserProfile, AvatarType } from "../types";
 import { ArrowLeft, Volume2, Check, X, Sparkles, AlertCircle, HelpCircle, Star, Send } from "lucide-react";
+import { getLevelAndProgress, getLevelTitle } from "../utils/levels";
 
 interface LessonScreenProps {
   lesson: Lesson;
   profile: UserProfile;
   onClose: () => void;
-  onComplete: (xpEarned: number, wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
-  onIncorrectAnswer?: () => void;
+  onComplete: (wordsLearned: { word: string; translation: string; category: string; example: string; exampleTranslation: string }[]) => void;
+  onAwardXp: (xp: number) => void;
 }
 
 const AVATARS: Record<AvatarType, { name: string; icon: string }> = {
@@ -28,7 +29,7 @@ const speakEnglish = (text: string) => {
   }
 };
 
-export default function LessonScreen({ lesson, profile, onClose, onComplete, onIncorrectAnswer }: LessonScreenProps) {
+export default function LessonScreen({ lesson, profile, onClose, onComplete, onAwardXp }: LessonScreenProps) {
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [scrambledSelected, setScrambledSelected] = useState<string[]>([]);
@@ -50,8 +51,18 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
   
   // Track words learned in this lesson to add to vocabulary
   const [newWords, setNewWords] = useState<any[]>([]);
+  const [earnedXp, setEarnedXp] = useState(0);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+  const previousLevel = useRef(getLevelAndProgress(profile.xp).level);
 
   const exercise: Exercise = lesson.exercises[currentIdx];
+  const xpPerExercise = Math.max(10, Math.floor(lesson.xpReward / lesson.exercises.length));
+
+  useEffect(() => {
+    const level = getLevelAndProgress(profile.xp).level;
+    if (level > previousLevel.current) setLevelUp(level);
+    previousLevel.current = level;
+  }, [profile.xp]);
 
   useEffect(() => {
     // Speak prompt audio if available automatically
@@ -120,27 +131,32 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
         body: JSON.stringify({
           text: writingInput,
           prompt: exercise.writingPrompt,
-          targetLevel: "A1"
+          targetLevel: "A1",
+          userLevel: getLevelAndProgress(profile.xp).level
         })
       });
       const data = await res.json();
+      if (!res.ok || typeof data.isCorrect !== "boolean") {
+        throw new Error(data.error || "Não foi possível avaliar a resposta.");
+      }
       setAiFeedback(data);
       setIsAnswerCorrect(data.isCorrect);
       setHasChecked(true);
-      if (!data.isCorrect && onIncorrectAnswer) {
-        onIncorrectAnswer();
+      if (data.isCorrect) {
+        onAwardXp(xpPerExercise);
+        setEarnedXp((value) => value + xpPerExercise);
       }
     } catch (err) {
       console.error(err);
-      // Fallback in case of server failure (P1 compliance)
+      // A failed correction must never be presented as a correct answer.
       setAiFeedback({
-        isCorrect: true,
-        celebration: "Uau! Sua frase ficou excelente! 🎉 (Tutor IA)",
-        corrections: [],
+        isCorrect: false,
+        celebration: "Ainda não consegui corrigir sua frase agora.",
+        corrections: ["O corretor de IA está indisponível. Tente novamente em alguns instantes para receber a correção de verdade."],
         improvedVersion: writingInput,
-        explanation: "Sua resposta foi enviada com sucesso! Continue praticando."
+        explanation: "Nenhum XP foi concedido sem uma avaliação válida."
       });
-      setIsAnswerCorrect(true);
+      setIsAnswerCorrect(false);
       setHasChecked(true);
     } finally {
       setAiLoading(false);
@@ -168,8 +184,9 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
     setIsAnswerCorrect(correct);
     setHasChecked(true);
 
-    if (!correct && onIncorrectAnswer) {
-      onIncorrectAnswer();
+    if (correct) {
+      onAwardXp(xpPerExercise);
+      setEarnedXp((value) => value + xpPerExercise);
     }
 
     if (exercise.audioText && correct) {
@@ -208,7 +225,7 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
   };
 
   const handleFinishLesson = () => {
-    onComplete(lesson.xpReward, newWords);
+    onComplete(newWords);
   };
 
   const progressPercent = ((currentIdx) / lesson.exercises.length) * 100;
@@ -250,6 +267,14 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
           </span>
         </div>
       </header>
+
+      {levelUp && (
+        <div className="fixed inset-x-4 top-24 z-50 mx-auto max-w-md rounded-2xl bg-indigo-600 p-4 text-center text-white shadow-xl">
+          <p className="font-black">🚀 Você subiu para o Nível {levelUp}!</p>
+          <p className="mt-1 text-xs font-bold text-indigo-100">{getLevelTitle(levelUp)}</p>
+          <button type="button" onClick={() => setLevelUp(null)} className="mt-2 text-xs font-black underline">Continuar missão</button>
+        </div>
+      )}
 
       {/* Main Lesson Body */}
       {!showSummary ? (
@@ -562,8 +587,8 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
             {/* XP earned box */}
             <div className="flex-1 p-5 bg-white border-3 border-amber-200 rounded-2xl shadow-sm flex flex-col items-center">
               <span className="text-4xl">⭐</span>
-              <span className="font-black text-xl text-amber-600 mt-1">+{lesson.xpReward} XP</span>
-              <span className="text-xs font-bold text-slate-400 mt-0.5">Pontos de Treino</span>
+              <span className="font-black text-xl text-amber-600 mt-1">+{earnedXp} XP</span>
+              <span className="text-xs font-bold text-slate-400 mt-0.5">Pontos por acertos</span>
             </div>
             
             {/* Streak count box */}
@@ -638,7 +663,7 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onI
                           </span></span>
                         )}
                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-800 border border-red-200">
-                          -10 XP
+                          Sem XP nesta tentativa
                         </span>
                       </p>
                     </div>

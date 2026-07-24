@@ -66,6 +66,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [age, setAge] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [credentialsSaved, setCredentialsSaved] = useState<boolean>(false);
   const [avatar, setAvatar] = useState<AvatarType>("bunny");
   const [selectedEmoji, setSelectedEmoji] = useState<string>("🧸");
   const [ageGroup, setAgeGroup] = useState<AgeGroupType>("kids");
@@ -133,6 +134,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       }
       if (!password.trim()) {
         setNameError("Por favor, crie uma senha para proteger sua conta.");
+        return;
+      }
+      if (!credentialsSaved) {
+        setNameError("Antes de continuar, guarde o nome e a senha usados neste cadastro.");
         return;
       }
 
@@ -450,8 +455,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                     </label>
                     <input
                       type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value.slice(0, 20))}
+                        value={name}
+                      onChange={(e) => {
+                        setName(e.target.value.slice(0, 20));
+                        setCredentialsSaved(false);
+                      }}
                       placeholder="Como quer ser chamado?"
                       className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 focus:border-sky-400 outline-none rounded-xl font-bold text-slate-800 transition-colors"
                     />
@@ -484,7 +492,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                         <input
                           type={showPassword ? "text" : "password"}
                           value={password}
-                          onChange={(e) => setPassword(e.target.value.slice(0, 15))}
+                          onChange={(e) => {
+                            setPassword(e.target.value.slice(0, 15));
+                            setCredentialsSaved(false);
+                          }}
                           placeholder="Ex: 1234 ou bola"
                           className="w-full pl-4 pr-10 py-3 bg-slate-50 border-2 border-slate-200 focus:border-sky-400 outline-none rounded-xl font-bold text-slate-800 transition-colors"
                         />
@@ -506,22 +517,34 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                     </div>
                   )}
 
-                  {/* Security Banner Info */}
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3.5 flex gap-2.5 items-start">
-                    <Shield className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                  {/* Credential and storage warning */}
+                  <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-3.5 flex gap-2.5 items-start">
+                    <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-extrabold text-xs text-indigo-950 block">Proteção Integrada da Conta</span>
-                      <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
-                        A sua senha é salva apenas neste aparelho e protege seu progresso de outros colegas ou irmãos no mesmo computador!
+                      <span className="font-extrabold text-xs text-amber-950 block">Guarde seu nome e sua senha</span>
+                      <p className="text-[11px] text-slate-600 leading-relaxed mt-0.5">
+                        Anote ou peça para um responsável guardar o nome e a senha exatamente como foram escritos. Sem eles, não será possível entrar neste perfil e você poderá ter de criar outro, começando o progresso novamente.
                       </p>
                     </div>
                   </div>
+
+                  <label className="flex items-start gap-2.5 rounded-xl border border-indigo-100 bg-indigo-50 p-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={credentialsSaved}
+                      onChange={(e) => setCredentialsSaved(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-indigo-600"
+                    />
+                    <span className="text-[11px] font-bold leading-relaxed text-indigo-950">
+                      Já guardei o meu nome e a minha senha. Sei que o progresso fica somente neste navegador e aparelho.
+                    </span>
+                  </label>
                 </div>
 
                 <div className="mt-8 w-full flex justify-end max-w-md">
                   <button
                     type="button"
-                    disabled={!name.trim() || !age.trim() || !password.trim()}
+                    disabled={!name.trim() || !age.trim() || !password.trim() || !credentialsSaved}
                     onClick={handleNext}
                     className="w-full py-4 px-6 bg-sky-400 hover:bg-sky-500 disabled:bg-slate-200 text-white font-black rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg disabled:cursor-not-allowed text-lg"
                   >

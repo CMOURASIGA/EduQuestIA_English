@@ -2,17 +2,17 @@
  * SpaceAcademy Progressive & Infinite Level Utility
  * 
  * Formula:
- * To reach Level L (for L >= 2), the cumulative XP required is:
- * CumulativeXP(L) = (L - 1) * 200 + (L - 1) * (L - 2) * 50
+ * To reach the next level from level L, the cumulative XP required is:
+ * CumulativeXP(next) = L * 100 + L * (L - 1) * 50
  * 
  * This means:
  * - Level 1: 0 XP
- * - Level 2: 200 XP (Needs 200 XP from Lvl 1)
- * - Level 3: 500 XP (Needs 300 XP from Lvl 2)
- * - Level 4: 900 XP (Needs 400 XP from Lvl 3)
- * - Level 5: 1400 XP (Needs 500 XP from Lvl 4)
- * - Level 6: 2000 XP (Needs 600 XP from Lvl 5)
- * - Level 7: 2700 XP (Needs 700 XP from Lvl 6)
+ * - Level 2: 100 XP (Needs 100 XP from Lvl 1)
+ * - Level 3: 300 XP (Needs 200 XP from Lvl 2)
+ * - Level 4: 600 XP (Needs 300 XP from Lvl 3)
+ * - Level 5: 1000 XP (Needs 400 XP from Lvl 4)
+ * - Level 6: 1500 XP (Needs 500 XP from Lvl 5)
+ * - Level 7: 2100 XP (Needs 600 XP from Lvl 6)
  * and so on...
  */
 
@@ -29,7 +29,7 @@ export interface LevelProgress {
 export function getLevelAndProgress(xp: number): LevelProgress {
   let level = 1;
   while (true) {
-    const nextLevelCumulativeXp = level * 200 + level * (level - 1) * 50;
+    const nextLevelCumulativeXp = level * 100 + level * (level - 1) * 50;
     if (xp >= nextLevelCumulativeXp) {
       level++;
     } else {
@@ -37,8 +37,8 @@ export function getLevelAndProgress(xp: number): LevelProgress {
     }
   }
 
-  const currentLevelCumulativeXp = level === 1 ? 0 : (level - 1) * 200 + (level - 1) * (level - 2) * 50;
-  const nextLevelCumulativeXp = level * 200 + level * (level - 1) * 50;
+  const currentLevelCumulativeXp = level === 1 ? 0 : (level - 1) * 100 + (level - 1) * (level - 2) * 50;
+  const nextLevelCumulativeXp = level * 100 + level * (level - 1) * 50;
 
   const xpInCurrentLevel = xp - currentLevelCumulativeXp;
   const xpNeededForNextLevel = nextLevelCumulativeXp - currentLevelCumulativeXp;

@@ -227,7 +227,7 @@ export default function App() {
   };
 
   // Handle lesson completion rewards
-  const handleCompleteActiveLesson = (xpReward: number, wordsLearned: any[]) => {
+  const handleCompleteActiveLesson = (wordsLearned: any[]) => {
     if (!profile || !activeLessonId) return;
 
     // Check if first completion to add streak
@@ -262,7 +262,6 @@ export default function App() {
 
     const updatedProfile: UserProfile = {
       ...profile,
-      xp: profile.xp + xpReward,
       completedLessons: updatedCompleted,
       streak: newStreak,
       lastActiveDate: today,
@@ -308,12 +307,7 @@ export default function App() {
           profile={profile}
           onClose={() => setActiveLessonId(null)}
           onComplete={handleCompleteActiveLesson}
-          onIncorrectAnswer={() => {
-            if (profile) {
-              const newXp = Math.max(0, profile.xp - 10);
-              saveProfile({ ...profile, xp: newXp });
-            }
-          }}
+          onAwardXp={handleAwardXp}
         />
       );
     }
@@ -1197,4 +1191,3 @@ export default function App() {
     </div>
   );
 }
-

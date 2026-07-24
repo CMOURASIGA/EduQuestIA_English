@@ -106,7 +106,7 @@ export default function TutorChat({ profile }: TutorChatProps) {
         {
           id: "error-" + Math.random(),
           role: "model",
-          content: `Oops! Meu foguete de inglês balançou! 🚀 ${err.message || "Por favor, verifique a chave do Gemini."}`,
+          content: `Oops! Meu foguete de inglês balançou! 🚀 ${err.message || "Por favor, verifique a configuração do tutor."}`,
           timestamp: new Date().toLocaleTimeString()
         }
       ]);
