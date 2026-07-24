@@ -1,4 +1,4 @@
-import { generateOpenAIText, parseJsonResponse } from "./_openai.js";
+import { generateOpenAIText, getAIDiagnostic, OpenAIDiagnosticError, parseJsonResponse } from "./_openai.js";
 
 function criteriaForLevel(level: number): string {
   if (level <= 2) return "Avalie com acolhimento, mas sem marcar uma frase incorreta como correta. Considere correta apenas uma frase compreensível, em inglês e alinhada ao desafio. Pequenos erros de digitação podem ser aceitos somente se não mudarem o sentido.";
@@ -10,10 +10,6 @@ function criteriaForLevel(level: number): string {
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });
-
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(503).json({ error: "O corretor de IA ainda não foi configurado. Adicione OPENAI_API_KEY nas variáveis do servidor." });
-  }
 
   const { text, prompt, userLevel = 1 } = req.body || {};
   if (typeof text !== "string" || !text.trim() || typeof prompt !== "string") {
@@ -41,8 +37,9 @@ Use isCorrect true somente quando a resposta estiver correta para o desafio e se
     const feedback = parseJsonResponse(response) as Record<string, unknown>;
     if (typeof feedback.isCorrect !== "boolean") throw new Error("Resposta de avaliação inválida.");
     return res.status(200).json(feedback);
-  } catch (error: any) {
-    console.error("Erro no corretor de escrita:", error);
-    return res.status(500).json({ error: "Não foi possível avaliar a resposta agora." });
+  } catch (error: unknown) {
+    const diagnostic = getAIDiagnostic(error);
+    console.error(`[${diagnostic.requestId}] Erro no corretor de escrita:`, error);
+    return res.status(error instanceof OpenAIDiagnosticError ? error.status : 500).json({ error: `${diagnostic.message} Código: ${diagnostic.code}. Rastreio: ${diagnostic.requestId}.`, diagnostic });
   }
 }
