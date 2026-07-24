@@ -30,6 +30,16 @@ import { getUnlockedEmojis } from "./services/shopStorage";
 import { ShopItem } from "./types/shop";
 import { logTelemetryEvent } from "./services/telemetryService";
 
+const fallbackMission = (profile: UserProfile, missionNumber: number): Lesson => {
+  const isKids = profile.ageGroup === "kids";
+  const id = `practice-${Date.now()}-${missionNumber}`;
+  return { id, unitId: "adaptive-practice", unitTitle: `Missões adaptativas · Nível ${getLevelAndProgress(profile.xp).level}`, title: `${isKids ? "Aventura dos Animais" : "Missão: Rotina e Hobbies"} ${missionNumber}`, description: "Uma missão de prática criada para você continuar aprendendo enquanto a central de missões se conecta.", icon: isKids ? "🐾" : "🎮", xpReward: 60, exercises: [
+    { id: `${id}-1`, type: "multiple-choice", prompt: "Qual palavra em inglês combina com a missão?", options: isKids ? ["Cat", "Table", "Blue"] : ["Play", "Yellow", "Chair"], correctAnswer: isKids ? "Cat" : "Play", translationContext: "Leia as opções e escolha a palavra que faz sentido." },
+    { id: `${id}-2`, type: "fill-blank", prompt: isKids ? "Complete: 'I like my ___.'" : "Complete: 'I ___ video games.'", options: isKids ? ["cat", "red", "run"] : ["play", "blue", "dog"], correctAnswer: isKids ? "cat" : "play", translationContext: "Pense na palavra que completa a frase." },
+    { id: `${id}-3`, type: "writing-challenge", prompt: `Escreva uma frase simples em inglês sobre seu ${isKids ? "animal favorito" : "hobby favorito"}.`, writingPrompt: `Write one simple, correct English sentence about your ${isKids ? "favorite animal" : "favorite hobby"}.`, correctAnswer: "", translationContext: "Escreva uma frase curta. A IA vai corrigir e explicar." }
+  ] };
+};
+
 export default function App() {
   // Core Profile state
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -289,6 +299,31 @@ export default function App() {
     });
   };
 
+  const createNextMission = async (completedLesson: Lesson): Promise<Lesson> => {
+    if (!profile) throw new Error("Perfil não disponível.");
+    try {
+      const response = await fetch("/api/missions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        age: profile.age ?? (profile.ageGroup === "kids" ? 8 : 13), ageGroup: profile.ageGroup,
+        userLevel: getLevelAndProgress(profile.xp).level, goal: profile.goal, previousLessonTitle: completedLesson.title,
+        completedLessonTitles: lessons.slice(-8).map((item) => item.title),
+      }) });
+      const data = await response.json();
+      if (!response.ok || !data.lesson || !Array.isArray(data.lesson.exercises)) throw new Error(data.error || "Não foi possível criar a próxima missão.");
+      return data.lesson as Lesson;
+    } catch (error) {
+      console.warn("Missão por IA indisponível; usando missão de prática local.", error);
+      return fallbackMission(profile, lessons.length + 1);
+    }
+  };
+
+  const handleContinueJourney = async (wordsLearned: any[], currentLesson: Lesson, nextLesson: Lesson | null) => {
+    if (nextLesson) { handleCompleteActiveLesson(wordsLearned, nextLesson.id); return; }
+    handleCompleteActiveLesson(wordsLearned);
+    const generatedLesson = await createNextMission(currentLesson);
+    handleUpdateLessons([...lessons, generatedLesson]);
+    setActiveLessonId(generatedLesson.id);
+  };
+
   // LogOut helper to allow changing profile / avatar
   const handleLogOut = () => {
     if (confirm("Quer mesmo trocar de perfil? Seu progresso continuará salvo no seu navegador!")) {
@@ -307,11 +342,7 @@ export default function App() {
     const activeLessonObj = lessons.find((l) => l.id === activeLessonId);
     if (activeLessonObj) {
       const activeLessonIndex = lessons.findIndex((l) => l.id === activeLessonId);
-      // After the final mission, restart the trail so the player may keep practicing
-      // and earning XP instead of reaching a dead end.
-      const nextLesson = lessons.length > 0
-        ? lessons[(activeLessonIndex + 1) % lessons.length]
-        : null;
+      const nextLesson = activeLessonIndex >= 0 && activeLessonIndex + 1 < lessons.length ? lessons[activeLessonIndex + 1] : null;
       return (
         <LessonScreen
           lesson={activeLessonObj}
@@ -320,7 +351,7 @@ export default function App() {
           onComplete={handleCompleteActiveLesson}
           onAwardXp={handleAwardXp}
           nextLesson={nextLesson}
-          onContinueToNextLesson={(wordsLearned) => handleCompleteActiveLesson(wordsLearned, nextLesson?.id)}
+          onContinueToNextLesson={(wordsLearned) => handleContinueJourney(wordsLearned, activeLessonObj, nextLesson)}
         />
       );
     }
