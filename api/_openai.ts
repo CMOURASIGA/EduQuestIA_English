@@ -58,10 +58,13 @@ export async function generateOpenAIText({
   instructions,
   input,
   temperature = 0.4,
+  textFormat,
 }: {
   instructions: string;
   input: string | Array<{ role: "user" | "assistant"; content: string }>;
   temperature?: number;
+  /** Optional Responses API structured-output definition. */
+  textFormat?: Record<string, unknown>;
 }): Promise<string> {
   const requestId = createRequestId();
   const apiKey = process.env.OPENAI_API_KEY;
@@ -80,6 +83,7 @@ export async function generateOpenAIText({
       instructions,
       input,
       temperature,
+      ...(textFormat ? { text: { format: textFormat } } : {}),
     }),
     });
   } catch (error) {
