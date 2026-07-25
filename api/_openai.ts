@@ -32,6 +32,28 @@ export function getAIDiagnostic(error: unknown) {
   return { code: "AI_FUNCTION_ERROR", message: "A função de IA falhou antes de receber uma resposta da OpenAI. Consulte os logs do Vercel usando o código de rastreio.", requestId };
 }
 
+/**
+ * A API Responses devolve o texto dentro de `output[].content[]` no JSON
+ * bruto. Alguns clientes também expõem o atalho `output_text`; por isso
+ * aceitamos ambos os formatos sem depender de um SDK no runtime do Vercel.
+ */
+function extractResponseText(payload: any): string | null {
+  if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  if (!Array.isArray(payload?.output)) return null;
+
+  const text = payload.output
+    .flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
+    .filter((content: any) => content?.type === "output_text" && typeof content?.text === "string")
+    .map((content: any) => content.text.trim())
+    .filter(Boolean)
+    .join("\n");
+
+  return text || null;
+}
+
 export async function generateOpenAIText({
   instructions,
   input,
@@ -75,11 +97,20 @@ export async function generateOpenAIText({
     throw new OpenAIDiagnosticError(response.status, diagnostic.code, diagnostic.message, requestId);
   }
 
-  if (typeof payload.output_text !== "string" || !payload.output_text.trim()) {
+  const outputText = extractResponseText(payload);
+  if (!outputText) {
+    console.error(`[${requestId}] Resposta OpenAI sem texto extraível:`, {
+      id: payload?.id,
+      status: payload?.status,
+      incomplete_details: payload?.incomplete_details,
+      output_types: Array.isArray(payload?.output)
+        ? payload.output.flatMap((item: any) => Array.isArray(item?.content) ? item.content.map((content: any) => content?.type) : [])
+        : [],
+    });
     throw new OpenAIDiagnosticError(502, "OPENAI_EMPTY_RESPONSE", "A OpenAI respondeu, mas não devolveu conteúdo utilizável. Consulte os logs do Vercel com o código de rastreio.", requestId);
   }
 
-  return payload.output_text.trim();
+  return outputText;
 }
 
 export function parseJsonResponse(text: string): unknown {
