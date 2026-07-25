@@ -18,13 +18,19 @@ const missionJsonSchema = {
           exercises: {
             type: "array", minItems: 3, maxItems: 5,
             items: {
-              oneOf: [
-                { type: "object", additionalProperties: false, required: ["type", "prompt", "options", "correctAnswer"], properties: { type: { const: "multiple-choice" }, prompt: { type: "string" }, options: { type: "array", minItems: 2, items: { type: "string" } }, correctAnswer: { type: "string" }, audioText: { type: "string" }, translationContext: { type: "string" } } },
-                { type: "object", additionalProperties: false, required: ["type", "prompt", "options", "correctAnswer"], properties: { type: { const: "arrange-words" }, prompt: { type: "string" }, options: { type: "array", minItems: 2, items: { type: "string" } }, correctAnswer: { type: "string" }, audioText: { type: "string" }, translationContext: { type: "string" } } },
-                { type: "object", additionalProperties: false, required: ["type", "prompt", "options", "correctAnswer"], properties: { type: { const: "fill-blank" }, prompt: { type: "string" }, options: { type: "array", minItems: 2, items: { type: "string" } }, correctAnswer: { type: "string" }, audioText: { type: "string" }, translationContext: { type: "string" } } },
-                { type: "object", additionalProperties: false, required: ["type", "prompt", "leftPairs", "rightPairs"], properties: { type: { const: "match-pairs" }, prompt: { type: "string" }, leftPairs: { type: "array", minItems: 2, items: { type: "string" } }, rightPairs: { type: "array", minItems: 2, items: { type: "string" } }, audioText: { type: "string" }, translationContext: { type: "string" } } },
-                { type: "object", additionalProperties: false, required: ["type", "prompt", "writingPrompt"], properties: { type: { const: "writing-challenge" }, prompt: { type: "string" }, writingPrompt: { type: "string" }, translationContext: { type: "string" } } }
-              ]
+              type: "object", additionalProperties: false,
+              required: ["type", "prompt", "options", "correctAnswer", "leftPairs", "rightPairs", "writingPrompt", "audioText", "translationContext"],
+              properties: {
+                type: { type: "string", enum: ["multiple-choice", "arrange-words", "fill-blank", "match-pairs", "writing-challenge"] },
+                prompt: { type: "string" },
+                options: { type: "array", items: { type: "string" } },
+                correctAnswer: { type: "string" },
+                leftPairs: { type: "array", items: { type: "string" } },
+                rightPairs: { type: "array", items: { type: "string" } },
+                writingPrompt: { type: "string" },
+                audioText: { type: "string" },
+                translationContext: { type: "string" }
+              }
             }
           }
         }
@@ -58,7 +64,7 @@ export default async function handler(req: any, res: any) {
   if (!Number.isFinite(Number(age)) || !["kids", "teens"].includes(ageGroup)) return res.status(400).json({ error: "Perfil do aluno inválido para criar a missão." });
   const audience = ageGroup === "kids" ? "criança, com frases muito curtas e temas seguros como animais, espaço, brincadeiras e família" : "pré-adolescente ou adolescente, com temas seguros como games, música, esportes, amizade, viagens e tecnologia";
   try {
-    const text = await generateOpenAIText({ temperature: 0.7, textFormat: missionJsonSchema, instructions: `Você cria uma única missão de inglês para uma ${audience}, com ${age} anos e nível interno ${userLevel}. Ensine algo novo, sem repetir tema ou palavras centrais das missões concluídas. Não use temas adultos, violência, namoro, dados pessoais ou conteúdo inadequado. Crie 3 a 5 exercícios objetivos, no máximo um writing-challenge. Siga exatamente o esquema JSON fornecido. Para opções, use textos em inglês. Em múltipla escolha e preencher lacuna, correctAnswer precisa aparecer em options. Em organize as palavras, options são as palavras embaralhadas e correctAnswer é a frase ordenada. Nos pares, leftPairs e rightPairs devem ter a mesma quantidade e a tradução na mesma posição.`, input: `Objetivo: ${typeof goal === "string" ? goal : "aprender inglês"}\nMissão concluída: ${typeof previousLessonTitle === "string" ? previousLessonTitle : "não informada"}\nNão repetir: ${Array.isArray(completedLessonTitles) ? completedLessonTitles.join(" | ") : "nenhuma"}` });
+    const text = await generateOpenAIText({ temperature: 0.7, textFormat: missionJsonSchema, instructions: `Você cria uma única missão de inglês para uma ${audience}, com ${age} anos e nível interno ${userLevel}. Ensine algo novo, sem repetir tema ou palavras centrais das missões concluídas. Não use temas adultos, violência, namoro, dados pessoais ou conteúdo inadequado. Crie 3 a 5 exercícios objetivos, no máximo um writing-challenge. Siga exatamente o esquema JSON fornecido. Todo exercício DEVE conter todos os campos do esquema. Para campos que não se aplicam ao tipo escolhido, devolva string vazia ou array vazio. Para opções, use textos em inglês. Em múltipla escolha e preencher lacuna, correctAnswer precisa aparecer em options. Em organize as palavras, options são as palavras embaralhadas e correctAnswer é a frase ordenada. Nos pares, leftPairs e rightPairs devem ter a mesma quantidade e a tradução na mesma posição.`, input: `Objetivo: ${typeof goal === "string" ? goal : "aprender inglês"}\nMissão concluída: ${typeof previousLessonTitle === "string" ? previousLessonTitle : "não informada"}\nNão repetir: ${Array.isArray(completedLessonTitles) ? completedLessonTitles.join(" | ") : "nenhuma"}` });
     return res.status(200).json({ lesson: normalizeLesson(parseJsonResponse(text), Date.now().toString(36)) });
   } catch (error: unknown) {
     if (error instanceof InvalidMissionError) {
