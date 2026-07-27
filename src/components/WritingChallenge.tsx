@@ -79,7 +79,8 @@ export default function WritingChallenge({ profile, onXpEarned }: WritingChallen
           text: inputText,
           prompt: selectedChallenge.prompt,
           targetLevel: profile.ageGroup === "kids" ? "A1-Kids" : "A1-Teens",
-          userLevel
+          userLevel,
+          ageGroup: profile.ageGroup
         })
       });
 
