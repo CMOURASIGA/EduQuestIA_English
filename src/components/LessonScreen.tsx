@@ -136,7 +136,8 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
           text: writingInput,
           prompt: exercise.writingPrompt,
           targetLevel: "A1",
-          userLevel: getLevelAndProgress(profile.xp).level
+          userLevel: getLevelAndProgress(profile.xp).level,
+          ageGroup: profile.ageGroup
         })
       });
       const data = await res.json();
@@ -230,7 +231,7 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
   };
 
   const handleFinishLesson = () => {
-    onComplete(newWords);
+    onComplete(lesson.vocabulary?.length ? lesson.vocabulary : newWords);
   };
 
   const handleContinueJourney = async () => {
@@ -241,7 +242,7 @@ export default function LessonScreen({ lesson, profile, onClose, onComplete, onA
     setContinuingJourney(true);
     setJourneyError(null);
     try {
-      await onContinueToNextLesson(newWords);
+      await onContinueToNextLesson(lesson.vocabulary?.length ? lesson.vocabulary : newWords);
     } catch (error: any) {
       setJourneyError(error?.message || "Não foi possível criar sua próxima missão agora. Tente novamente.");
     } finally {
