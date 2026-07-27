@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import { UserProfile, ChatMessage, AvatarType } from "../types";
+import { UserProfile, ChatMessage, AvatarType, VocabularyItem } from "../types";
 import { Volume2, Send, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { getLevelAndProgress } from "../utils/levels";
 
 interface TutorChatProps {
   profile: UserProfile;
+  vocabulary: VocabularyItem[];
 }
 
 const AVATAR_SPECS: Record<AvatarType, { name: string; icon: string; welcome: string }> = {
@@ -24,7 +25,7 @@ const speakEnglish = (text: string) => {
   }
 };
 
-export default function TutorChat({ profile }: TutorChatProps) {
+export default function TutorChat({ profile, vocabulary }: TutorChatProps) {
   const avatarSpec = AVATAR_SPECS[profile.avatar];
   
   // Initialize with welcome message
@@ -80,7 +81,10 @@ export default function TutorChat({ profile }: TutorChatProps) {
           avatar: avatarSpec.name,
           ageGroup: profile.ageGroup,
           childName: profile.displayName,
-          userLevel
+          userLevel,
+          age: profile.age,
+          goal: profile.goal,
+          knownWords: vocabulary.map((item) => item.word).slice(-30),
         })
       });
 
