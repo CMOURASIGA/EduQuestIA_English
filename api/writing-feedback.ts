@@ -1,4 +1,5 @@
 import { generateOpenAIText, getAIDiagnostic, OpenAIDiagnosticError, parseJsonResponse } from "./_openai.js";
+import { writingTeacherInstructions } from "./eduquestTeacher.js";
 
 function criteriaForLevel(level: number): string {
   if (level <= 2) return "Avalie com acolhimento, mas sem marcar uma frase incorreta como correta. Considere correta apenas uma frase compreensível, em inglês e alinhada ao desafio. Pequenos erros de digitação podem ser aceitos somente se não mudarem o sentido.";
@@ -11,16 +12,17 @@ function criteriaForLevel(level: number): string {
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });
 
-  const { text, prompt, userLevel = 1 } = req.body || {};
+  const { text, prompt, userLevel = 1, ageGroup = "kids" } = req.body || {};
   if (typeof text !== "string" || !text.trim() || typeof prompt !== "string") {
     return res.status(400).json({ error: "Envie a frase do aluno e o enunciado do desafio." });
   }
+  if (!["kids", "teens"].includes(ageGroup)) return res.status(400).json({ error: "Perfil do aluno inválido para a correção." });
 
   try {
     const response = await generateOpenAIText({
       input: `Desafio proposto: "${prompt}"\nTexto escrito pelo aluno: "${text}"`,
       temperature: 0.2,
-      instructions: `Você é um corretor de inglês acolhedor e preciso para crianças e adolescentes. ${criteriaForLevel(Number(userLevel))}
+      instructions: `${writingTeacherInstructions(Number(userLevel), ageGroup, criteriaForLevel(Number(userLevel)))}
 
 Retorne APENAS JSON neste formato:
 {
