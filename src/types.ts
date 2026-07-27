@@ -48,6 +48,8 @@ export interface Lesson {
   icon: string; // Lucide icon name or emoji
   xpReward: number;
   exercises: Exercise[];
+  /** Words proposed by the Professor EduQuest. They enter the Baú after completion. */
+  vocabulary?: Omit<VocabularyItem, "id" | "learnedAt" | "mastery">[];
 }
 
 export interface VocabularyItem {
