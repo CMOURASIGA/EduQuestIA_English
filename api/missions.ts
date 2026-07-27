@@ -1,4 +1,5 @@
 import { generateOpenAIText, getAIDiagnostic, parseJsonResponse, OpenAIDiagnosticError } from "./_openai.js";
+import { LearnerSnapshot, learnerContext, missionTeacherInstructions } from "./eduquestTeacher.js";
 
 const allowedTypes = new Set(["multiple-choice", "arrange-words", "fill-blank", "match-pairs", "writing-challenge"]);
 
@@ -11,7 +12,7 @@ const missionJsonSchema = {
     properties: {
       lesson: {
         type: "object", additionalProperties: false,
-        required: ["unitId", "unitTitle", "title", "description", "icon", "xpReward", "exercises"],
+        required: ["unitId", "unitTitle", "title", "description", "icon", "xpReward", "exercises", "vocabulary"],
         properties: {
           unitId: { type: "string" }, unitTitle: { type: "string" }, title: { type: "string" },
           description: { type: "string" }, icon: { type: "string" }, xpReward: { type: "number" },
@@ -38,7 +39,18 @@ const missionJsonSchema = {
                 translationContext: { type: "string" }
               }
             }
-          }
+          },
+          vocabulary: {
+            type: "array", minItems: 3, maxItems: 6,
+            items: {
+              type: "object", additionalProperties: false,
+              required: ["word", "translation", "example", "exampleTranslation", "category"],
+              properties: {
+                word: { type: "string" }, translation: { type: "string" }, example: { type: "string" },
+                exampleTranslation: { type: "string" }, category: { type: "string" }
+              }
+            }
+          },
         }
       }
     }
@@ -61,21 +73,24 @@ function normalizeLesson(raw: any, suffix: string) {
     if (exercise.type === "match-pairs" && (!Array.isArray(exercise.leftPairs) || !Array.isArray(exercise.rightPairs) || exercise.leftPairs.length < 2 || exercise.leftPairs.length !== exercise.rightPairs.length)) throw new InvalidMissionError(`${label}: pares incompletos ou com quantidades diferentes.`);
     return { ...exercise, id: `ai-${suffix}-${index + 1}`, correctAnswer: exercise.type === "writing-challenge" ? "" : exercise.correctAnswer };
   });
-  return { id: `ai-mission-${suffix}`, unitId: typeof lesson.unitId === "string" ? lesson.unitId : "adaptive-mission", unitTitle: typeof lesson.unitTitle === "string" ? lesson.unitTitle : "Missão adaptativa", title: typeof lesson.title === "string" ? lesson.title : "Nova missão", description: typeof lesson.description === "string" ? lesson.description : "Uma missão criada para o seu momento de aprendizado.", icon: typeof lesson.icon === "string" ? lesson.icon : "🚀", xpReward: Math.min(120, Math.max(60, Number(lesson.xpReward) || 80)), exercises };
-}
-
-function missionInstructions(audience: string, age: unknown, userLevel: unknown) {
-  return `Você cria uma única missão de inglês para uma ${audience}, com ${age} anos e nível interno ${userLevel}. Ensine algo novo, sem repetir tema ou palavras centrais das missões concluídas. Não use temas adultos, violência, namoro, dados pessoais ou conteúdo inadequado. Crie 3 a 5 exercícios objetivos, no máximo um writing-challenge. Siga exatamente o esquema JSON fornecido. Todo exercício DEVE conter todos os campos do esquema. Para campos que não se aplicam ao tipo escolhido, devolva string vazia ou array vazio. REGRA INEGOCIÁVEL: prompt é o enunciado exibido na tela e deve ser uma frase não vazia em português em TODOS os exercícios, inclusive writing-challenge. Para opções, use textos em inglês. Em múltipla escolha e preencher lacuna, correctAnswer precisa aparecer em options. Em organize as palavras, options são as palavras embaralhadas e correctAnswer é a frase ordenada. Nos pares, leftPairs e rightPairs devem ter a mesma quantidade e a tradução na mesma posição.`;
+  if (!Array.isArray(lesson.vocabulary) || lesson.vocabulary.length < 3) throw new InvalidMissionError("Baú: a missão precisa trazer de 3 a 6 palavras novas.");
+  const vocabulary = lesson.vocabulary.map((item: any, index: number) => {
+    const fields = ["word", "translation", "example", "exampleTranslation", "category"];
+    const invalid = fields.find((field) => typeof item?.[field] !== "string" || !item[field].trim());
+    if (invalid) throw new InvalidMissionError(`Baú, palavra ${index + 1}: campo '${invalid}' ausente.`);
+    return { word: item.word.trim(), translation: item.translation.trim(), example: item.example.trim(), exampleTranslation: item.exampleTranslation.trim(), category: item.category.trim() };
+  });
+  return { id: `ai-mission-${suffix}`, unitId: typeof lesson.unitId === "string" ? lesson.unitId : "adaptive-mission", unitTitle: typeof lesson.unitTitle === "string" ? lesson.unitTitle : "Missão adaptativa", title: typeof lesson.title === "string" ? lesson.title : "Nova missão", description: typeof lesson.description === "string" ? lesson.description : "Uma missão criada para o seu momento de aprendizado.", icon: typeof lesson.icon === "string" ? lesson.icon : "🚀", xpReward: Math.min(120, Math.max(60, Number(lesson.xpReward) || 80)), exercises, vocabulary };
 }
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });
-  const { age, ageGroup, userLevel = 1, goal, previousLessonTitle, completedLessonTitles = [] } = req.body || {};
+  const { age, ageGroup, userLevel = 1, goal, previousLessonTitle, completedLessonTitles = [], knownWords = [] } = req.body || {};
   if (!Number.isFinite(Number(age)) || !["kids", "teens"].includes(ageGroup)) return res.status(400).json({ error: "Perfil do aluno inválido para criar a missão." });
-  const audience = ageGroup === "kids" ? "criança, com frases muito curtas e temas seguros como animais, espaço, brincadeiras e família" : "pré-adolescente ou adolescente, com temas seguros como games, música, esportes, amizade, viagens e tecnologia";
+  const learner: LearnerSnapshot = { age: Number(age), ageGroup, level: Number(userLevel), goal: typeof goal === "string" ? goal : "aprender inglês", completedLessonTitles: Array.isArray(completedLessonTitles) ? completedLessonTitles.filter((value): value is string => typeof value === "string") : [], knownWords: Array.isArray(knownWords) ? knownWords.filter((value): value is string => typeof value === "string") : [] };
   try {
-    const context = `Objetivo: ${typeof goal === "string" ? goal : "aprender inglês"}\nMissão concluída: ${typeof previousLessonTitle === "string" ? previousLessonTitle : "não informada"}\nNão repetir: ${Array.isArray(completedLessonTitles) ? completedLessonTitles.join(" | ") : "nenhuma"}`;
-    const instructions = missionInstructions(audience, age, userLevel);
+    const context = learnerContext(learner, typeof previousLessonTitle === "string" ? previousLessonTitle : undefined);
+    const instructions = missionTeacherInstructions(learner);
 
     try {
       const text = await generateOpenAIText({ temperature: 0.5, textFormat: missionJsonSchema, instructions, input: context });
