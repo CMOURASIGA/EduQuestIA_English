@@ -26,19 +26,23 @@ export interface LevelProgress {
   xpRemaining: number;
 }
 
+/** Cumulative XP required to reach (enter) a given level. Exported so any
+ * screen that needs to display level thresholds (e.g. the Journey Guide)
+ * reads them from a single source instead of re-deriving the formula and
+ * drifting out of sync with it. */
+export function getCumulativeXpForLevel(level: number): number {
+  if (level <= 1) return 0;
+  return (level - 1) * 100 + (level - 1) * (level - 2) * 50;
+}
+
 export function getLevelAndProgress(xp: number): LevelProgress {
   let level = 1;
-  while (true) {
-    const nextLevelCumulativeXp = level * 100 + level * (level - 1) * 50;
-    if (xp >= nextLevelCumulativeXp) {
-      level++;
-    } else {
-      break;
-    }
+  while (xp >= getCumulativeXpForLevel(level + 1)) {
+    level++;
   }
 
-  const currentLevelCumulativeXp = level === 1 ? 0 : (level - 1) * 100 + (level - 1) * (level - 2) * 50;
-  const nextLevelCumulativeXp = level * 100 + level * (level - 1) * 50;
+  const currentLevelCumulativeXp = getCumulativeXpForLevel(level);
+  const nextLevelCumulativeXp = getCumulativeXpForLevel(level + 1);
 
   const xpInCurrentLevel = xp - currentLevelCumulativeXp;
   const xpNeededForNextLevel = nextLevelCumulativeXp - currentLevelCumulativeXp;
@@ -74,8 +78,8 @@ export function getLevelTitle(level: number): string {
 
 export function getLevelPerk(level: number): string {
   if (level === 1) return "Início da jornada espacial! Desbloqueie as primeiras ilhas de vocabulário e aprenda a se apresentar em inglês.";
-  if (level === 2) return "Conversas lúdicas desbloqueadas! O Tutor de IA Pip, Barnaby, Fiona ou Leo responde a gírias e tópicos básicos.";
-  if (level === 3) return "Desafios de Escrita Mágica liberados! A IA começa a avaliar frases criadas por você de forma paciente.";
+  if (level === 2) return "Papo mais solto com o Tutor de IA! Pip, Barnaby, Fiona ou Leo já trocam ideia com você sobre gírias e temas do dia a dia.";
+  if (level === 3) return "Você já manda bem na Escrita Mágica! A IA passa a te dar dicas mais detalhadas nas frases que você mesmo escreve.";
   if (level === 4) return "Prática de pronúncia ativa! Seu vocabulário cresce e o Tutor estimula frases completas.";
   if (level === 5) return "Fluência básica alcançada! Você já consegue pedir comidas, falar de amigos e hobbies com confiança.";
   if (level === 6) return "O Tutor IA sobe o nível! Ele usará um inglês mais intermediário e fará perguntas mais elaboradas.";

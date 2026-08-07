@@ -3,7 +3,7 @@ import {
   X, Sparkles, Flame, Star, Award, BookOpen, 
   MessageSquare, PenTool, Shield, Settings, Play, Info 
 } from "lucide-react";
-import { getLevelAndProgress, getLevelTitle, getLevelPerk } from "../utils/levels";
+import { getLevelAndProgress, getLevelTitle, getLevelPerk, getCumulativeXpForLevel } from "../utils/levels";
 
 interface JourneyGuideProps {
   isOpen: boolean;
@@ -22,8 +22,10 @@ export default function JourneyGuide({ isOpen, onClose, currentXp }: JourneyGuid
   const maxLevelToShow = Math.max(10, currentLevel + 3);
   const levelsInfo = [];
   for (let l = 1; l <= maxLevelToShow; l++) {
-    const minXp = l === 1 ? 0 : (l - 1) * 200 + (l - 1) * (l - 2) * 50;
-    const maxXp = l * 200 + l * (l - 1) * 50 - 1;
+    // Read thresholds from the same formula used by getLevelAndProgress, so
+    // the guide can never drift out of sync with the actual leveling logic.
+    const minXp = getCumulativeXpForLevel(l);
+    const maxXp = getCumulativeXpForLevel(l + 1) - 1;
     levelsInfo.push({
       num: l,
       name: getLevelTitle(l),

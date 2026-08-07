@@ -50,6 +50,8 @@ export interface Lesson {
   exercises: Exercise[];
   /** Words proposed by the Professor EduQuest. They enter the Baú after completion. */
   vocabulary?: Omit<VocabularyItem, "id" | "learnedAt" | "mastery">[];
+  /** learning_content ids used to build this mission, when it came from the shared catalog. */
+  catalogContentIds?: string[];
 }
 
 export interface VocabularyItem {

@@ -7,6 +7,7 @@ import {
   Key, X, AlertCircle 
 } from "lucide-react";
 import { getLevelAndProgress } from "../utils/levels";
+import { toIsoDate } from "../utils/streak";
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
@@ -169,7 +170,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       dailyMinutes,
       xp: initialXp,
       streak: 1,
-      lastActiveDate: new Date().toLocaleDateString(),
+      lastActiveDate: toIsoDate(new Date()),
       completedLessons: [],
       vocabularyCount: 0,
       password: password.trim() // store password in profile

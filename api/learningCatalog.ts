@@ -17,6 +17,13 @@ export class LearningCatalogError extends Error {
   }
 }
 
+// Product identity inside the shared Supabase catalog (`learning_content`,
+// `product_content_publications`, `learner_content_history`). The same base
+// is shared with other products (e.g. Terravox) via `product_code`, so every
+// query here must stay scoped to "eduquest" and must never assume it is the
+// only consumer of the tables.
+const PRODUCT_CODE = "eduquest";
+
 function catalogLevelFor(userLevel: number) {
   if (userLevel <= 2) return "pre_a1";
   if (userLevel <= 6) return "a1";
@@ -31,18 +38,21 @@ function value(row: CatalogRow, ...keys: string[]) {
   return "";
 }
 
+// Field names below match the real `learning_content` columns (term_en,
+// translation_pt, example_en, example_pt, theme, cefr_level) instead of the
+// generic aliases used previously, which never matched the actual schema.
 function asCatalogWord(row: CatalogRow): CatalogWord | null {
-  const word = value(row, "word", "term", "title", "content");
-  const translation = value(row, "translation", "translation_pt_br", "meaning", "meaning_pt_br");
+  const word = value(row, "term_en");
+  const translation = value(row, "translation_pt");
   if (!word || !translation) return null;
   return {
     id: value(row, "id") || `catalog-${word.toLowerCase().replace(/\W+/g, "-")}`,
     word,
     translation,
-    example: value(row, "example", "example_sentence", "sentence") || `I can use ${word}.`,
-    exampleTranslation: value(row, "example_translation", "example_translation_pt_br", "sentence_translation") || `Eu posso usar ${translation}.`,
-    category: value(row, "category", "theme", "topic") || "vocabulário",
-    level: value(row, "level", "cefr_level", "pedagogical_level") || "pre_a1",
+    example: value(row, "example_en") || `I can use ${word}.`,
+    exampleTranslation: value(row, "example_pt") || `Eu posso usar ${translation}.`,
+    category: value(row, "theme") || "vocabulário",
+    level: value(row, "cefr_level") || "pre_a1",
   };
 }
 
@@ -76,10 +86,27 @@ async function supabaseRequest(path: string, init?: RequestInit) {
   return response;
 }
 
+// `learning_content` has no `is_active` column — publication per product is
+// tracked in `product_content_publications`. We resolve the ids published
+// for EduQuest first, then read the content itself.
+async function getPublishedContentIds(): Promise<string[]> {
+  const response = await supabaseRequest(
+    `product_content_publications?select=content_id&product_code=eq.${PRODUCT_CODE}&is_active=eq.true&limit=200`
+  );
+  const rows = (await response.json()) as CatalogRow[];
+  return rows.map((row) => value(row, "content_id")).filter(Boolean);
+}
+
 export async function getCatalogWords(params: { userLevel: number; knownWords: string[]; amount?: number }) {
   const desiredLevel = catalogLevelFor(params.userLevel);
-  const response = await supabaseRequest("learning_content?select=*&is_active=eq.true&order=created_at.asc&limit=100");
-  const rows = await response.json() as CatalogRow[];
+  const contentIds = await getPublishedContentIds();
+  if (!contentIds.length) throw new LearningCatalogError("Nenhum conteúdo do catálogo está publicado para o EduQuest no momento.", 422);
+
+  const idsFilter = contentIds.join(",");
+  const response = await supabaseRequest(
+    `learning_content?select=*&status=eq.approved&id=in.(${idsFilter})&order=created_at.asc&limit=100`
+  );
+  const rows = (await response.json()) as CatalogRow[];
   const known = new Set(params.knownWords.map((word) => word.trim().toLowerCase()));
   const words = rows.map(asCatalogWord).filter((word): word is CatalogWord => Boolean(word));
   const exactLevel = words.filter((word) => word.level.toLowerCase() === desiredLevel && !known.has(word.word.toLowerCase()));
@@ -89,18 +116,65 @@ export async function getCatalogWords(params: { userLevel: number; knownWords: s
   return { words: selected, level: desiredLevel };
 }
 
-export async function recordCatalogProgress(params: { learnerId: string; contentIds: string[]; lessonId: string; outcome: "completed" | "practiced" }) {
-  if (!params.contentIds.length) return;
-  const payload = params.contentIds.map((contentId) => ({
-    learner_id: params.learnerId,
-    learning_content_id: contentId,
-    lesson_id: params.lessonId,
-    outcome: params.outcome,
-    completed_at: new Date().toISOString(),
-  }));
-  await supabaseRequest("learner_content_history", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify(payload),
-  });
+// `learner_content_history` has no unique constraint on
+// (product_code, learner_external_id, content_id), so we read the existing
+// row first and decide between PATCH (accumulate exposure) and POST (first
+// time this learner sees this content) instead of relying on a DB upsert.
+export async function recordCatalogProgress(params: { learnerId: string; contentIds: string[] }) {
+  const contentIds = Array.from(new Set(params.contentIds.filter(Boolean)));
+  if (!contentIds.length) return;
+
+  const existingResponse = await supabaseRequest(
+    `learner_content_history?select=id,content_id,exposure_count,correct_count&product_code=eq.${PRODUCT_CODE}&learner_external_id=eq.${encodeURIComponent(params.learnerId)}&content_id=in.(${contentIds.join(",")})`
+  );
+  const existingRows = (await existingResponse.json()) as CatalogRow[];
+  const existingByContentId = new Map(existingRows.map((row) => [String(row.content_id), row]));
+
+  const nowIso = new Date().toISOString();
+  const requests: Promise<Response>[] = [];
+  const toInsert: CatalogRow[] = [];
+
+  for (const contentId of contentIds) {
+    const existing = existingByContentId.get(contentId);
+    if (existing) {
+      const exposureCount = Number(existing.exposure_count ?? 0) + 1;
+      const correctCount = Number(existing.correct_count ?? 0) + 1;
+      requests.push(
+        supabaseRequest(`learner_content_history?id=eq.${existing.id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            exposure_count: exposureCount,
+            correct_count: correctCount,
+            mastery_status: exposureCount >= 3 ? "review" : "learning",
+            last_seen_at: nowIso,
+          }),
+        })
+      );
+    } else {
+      toInsert.push({
+        product_code: PRODUCT_CODE,
+        learner_external_id: params.learnerId,
+        content_id: contentId,
+        exposure_count: 1,
+        correct_count: 1,
+        incorrect_count: 0,
+        mastery_status: "learning",
+        first_seen_at: nowIso,
+        last_seen_at: nowIso,
+      });
+    }
+  }
+
+  if (toInsert.length) {
+    requests.push(
+      supabaseRequest("learner_content_history", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(toInsert),
+      })
+    );
+  }
+
+  await Promise.all(requests);
 }

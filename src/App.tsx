@@ -13,6 +13,7 @@ import VocabularyTrainer from "./components/VocabularyTrainer";
 import WritingChallenge from "./components/WritingChallenge";
 import JourneyGuide from "./components/JourneyGuide";
 import { getLevelAndProgress, getLevelTitle } from "./utils/levels";
+import { getUpdatedStreak, toIsoDate } from "./utils/streak";
 import { 
   Sparkles, BookOpen, MessageSquare, Flame, LogOut, 
   Settings, PenTool, Home, Star, Play, Lock, CheckCircle2, Award,
@@ -235,14 +236,26 @@ export default function App() {
     handleUpdateVocabulary(updated);
   };
 
+  // Best-effort progress sync for missions sourced from the shared learning
+  // catalog. This never blocks the lesson-completion flow: XP, streak and
+  // the Baú always save locally first regardless of network status.
+  const recordCatalogVocabularyProgress = (lesson: Lesson, learnerId: string) => {
+    if (!lesson.catalogContentIds?.length) return;
+    fetch("/api/learning-progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ learnerId, contentIds: lesson.catalogContentIds }),
+    }).catch((error) => console.warn("Não foi possível registrar o progresso do catálogo:", error));
+  };
+
   // Handle lesson completion rewards
   const recordLessonCompletion = (wordsLearned: any[]) => {
     if (!profile || !activeLessonId) return;
 
     // Check if first completion to add streak
     const hasCompletedBefore = profile.completedLessons.includes(activeLessonId);
-    const updatedCompleted = hasCompletedBefore 
-      ? profile.completedLessons 
+    const updatedCompleted = hasCompletedBefore
+      ? profile.completedLessons
       : [...profile.completedLessons, activeLessonId];
 
     // Add learned words to vocabulary automatically (RF-008, RF-009)
@@ -262,12 +275,10 @@ export default function App() {
       }
     });
 
-    // Update streak continuously (RN-005)
-    let newStreak = profile.streak;
-    const today = new Date().toLocaleDateString();
-    if (profile.lastActiveDate !== today) {
-      newStreak += 1;
-    }
+    // Update streak: it only grows the day right after the last activity.
+    // Any gap of 2+ days breaks it and restarts at 1 (RN-005).
+    const today = toIsoDate(new Date());
+    const newStreak = getUpdatedStreak(profile.lastActiveDate, profile.streak);
 
     const updatedProfile: UserProfile = {
       ...profile,
@@ -280,6 +291,9 @@ export default function App() {
     setVocabulary(updatedVocab);
     localStorage.setItem(`playenglish_vocabulary_${profile.id}`, JSON.stringify(updatedVocab));
     saveProfile(updatedProfile);
+
+    const completedLesson = lessons.find((l) => l.id === activeLessonId);
+    if (completedLesson) recordCatalogVocabularyProgress(completedLesson, profile.id);
   };
 
   const handleCompleteActiveLesson = (wordsLearned: any[]) => {
