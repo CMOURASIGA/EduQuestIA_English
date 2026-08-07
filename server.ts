@@ -10,6 +10,7 @@ import adminContentImportHandler from "./api/admin-content-import";
 import adminContentListHandler from "./api/admin-content-list";
 import adminContentReviewHandler from "./api/admin-content-review";
 import adminContentPublishHandler from "./api/admin-content-publish";
+import cronContentImportHandler from "./api/cron-content-import";
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ async function startServer() {
   app.get("/api/admin-content-list", (req, res) => void adminContentListHandler(req, res));
   app.post("/api/admin-content-review", (req, res) => void adminContentReviewHandler(req, res));
   app.post("/api/admin-content-publish", (req, res) => void adminContentPublishHandler(req, res));
+  app.get("/api/cron-content-import", (req, res) => void cronContentImportHandler(req, res));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

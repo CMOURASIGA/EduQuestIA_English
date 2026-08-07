@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron-content-import",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
