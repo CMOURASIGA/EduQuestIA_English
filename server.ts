@@ -5,6 +5,11 @@ import dotenv from "dotenv";
 import tutorHandler from "./api/tutor";
 import writingFeedbackHandler from "./api/writing-feedback";
 import missionsHandler from "./api/missions";
+import learningProgressHandler from "./api/learning-progress";
+import adminContentImportHandler from "./api/admin-content-import";
+import adminContentListHandler from "./api/admin-content-list";
+import adminContentReviewHandler from "./api/admin-content-review";
+import adminContentPublishHandler from "./api/admin-content-publish";
 
 dotenv.config();
 
@@ -19,6 +24,11 @@ async function startServer() {
   app.post("/api/tutor", (req, res) => void tutorHandler(req, res));
   app.post("/api/writing-feedback", (req, res) => void writingFeedbackHandler(req, res));
   app.post("/api/missions", (req, res) => void missionsHandler(req, res));
+  app.post("/api/learning-progress", (req, res) => void learningProgressHandler(req, res));
+  app.post("/api/admin-content-import", (req, res) => void adminContentImportHandler(req, res));
+  app.get("/api/admin-content-list", (req, res) => void adminContentListHandler(req, res));
+  app.post("/api/admin-content-review", (req, res) => void adminContentReviewHandler(req, res));
+  app.post("/api/admin-content-publish", (req, res) => void adminContentPublishHandler(req, res));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

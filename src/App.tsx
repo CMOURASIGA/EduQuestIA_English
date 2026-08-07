@@ -9,6 +9,7 @@ import Onboarding from "./components/Onboarding";
 import LessonScreen from "./components/LessonScreen";
 import TutorChat from "./components/TutorChat";
 import AdminPanel from "./components/AdminPanel";
+import ContentImportPanel from "./components/admin/ContentImportPanel";
 import VocabularyTrainer from "./components/VocabularyTrainer";
 import WritingChallenge from "./components/WritingChallenge";
 import JourneyGuide from "./components/JourneyGuide";
@@ -925,6 +926,18 @@ export default function App() {
                   onUpdateLessons={handleUpdateLessons}
                   onResetLessons={handleResetLessons}
                 />
+              </div>
+
+              {/* Catalog content-import pipeline (Datamuse + dictionaryapi.dev + OpenAI) */}
+              <div className="bg-white rounded-[40px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 border-b-8 border-teal-500 flex flex-col gap-6 w-full">
+                <div>
+                  <h2 className="text-3xl font-black text-[#1A1C3D]">Catálogo Pedagógico 📚</h2>
+                  <p className="text-gray-500 text-sm font-semibold mt-1">
+                    Importe palavras novas de fontes externas, revise o que a IA sugeriu e publique só o que for aprovado. Nada entra em missão sem passar por aqui.
+                  </p>
+                </div>
+
+                <ContentImportPanel />
               </div>
 
             </div>
