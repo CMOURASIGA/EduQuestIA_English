@@ -311,14 +311,22 @@ export default function App() {
     });
   };
 
-  const createNextMission = async (completedLesson: Lesson): Promise<Lesson> => {
+  const createNextMission = async (completedLesson: Lesson, justLearnedWords: { word: string }[] = []): Promise<Lesson> => {
     if (!profile) throw new Error("Perfil não disponível.");
     try {
+      // Merge in the words from the lesson that just finished: recordLessonCompletion
+      // only updates the `vocabulary` state after this call resolves, so without this
+      // merge the next mission's knownWords would still be missing them and the
+      // catalog could hand the student the same words it just taught.
+      const knownWords = Array.from(new Set([
+        ...vocabulary.map((item) => item.word),
+        ...justLearnedWords.map((item) => item.word),
+      ]));
       const response = await fetch("/api/missions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         age: profile.age ?? (profile.ageGroup === "kids" ? 8 : 13), ageGroup: profile.ageGroup,
         userLevel: getLevelAndProgress(profile.xp).level, goal: profile.goal, previousLessonTitle: completedLesson.title,
         completedLessonTitles: lessons.slice(-10).map((item) => item.title),
-        knownWords: vocabulary.map((item) => item.word),
+        knownWords,
       }) });
       const data = await response.json();
       if (!response.ok || !data.lesson || !Array.isArray(data.lesson.exercises)) throw new Error(data.error || "Não foi possível criar a próxima missão.");
@@ -353,7 +361,7 @@ export default function App() {
     // Every new step in the journey is created for the student's current
     // profile. The starter lessons remain visible on the map, but must not
     // force the student into a fixed sequence after finishing a mission.
-    const generatedLesson = await createNextMission(currentLesson);
+    const generatedLesson = await createNextMission(currentLesson, wordsLearned);
     // A missão só é registrada e aberta quando a IA devolve uma estrutura válida.
     // Assim, não existe avanço automático nem uma missão local apresentada como IA.
     recordLessonCompletion(wordsLearned);

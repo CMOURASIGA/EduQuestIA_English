@@ -17,7 +17,9 @@ export function learningStage(level: number): string {
   if (level <= 2) return "iniciante absoluto (CEFR pré-A1/A1): vocabulário muito frequente e frases de 3 a 6 palavras";
   if (level <= 5) return "iniciante (A1): presente simples, preferências, rotina, lugares e descrições curtas";
   if (level <= 10) return "básico em evolução (A1/A2): perguntas, passado simples, futuro próximo e diálogos curtos";
-  return "intermediário: amplie vocabulário e prática comunicativa sem saltar etapas";
+  if (level <= 14) return "intermediário inicial (A2/B1): opiniões simples, comparações e pequenos parágrafos conectados";
+  if (level <= 19) return "intermediário (B1): vocabulário mais variado, sinônimos e evite repetir as mesmas palavras básicas";
+  return "intermediário avançado (B1/B2): fluência maior, expressões idiomáticas simples e diálogos abertos sem depender do português";
 }
 
 export function learnerContext(snapshot: LearnerSnapshot, previousLessonTitle?: string) {

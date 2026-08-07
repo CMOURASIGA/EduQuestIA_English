@@ -24,10 +24,17 @@ export class LearningCatalogError extends Error {
 // only consumer of the tables.
 const PRODUCT_CODE = "eduquest";
 
+// Mirrors the CEFR progression narrated in src/utils/levels.ts (getLevelPerk),
+// so the words handed to a mission keep getting harder as the student levels
+// up instead of freezing at "a2" forever past level 6. If the catalog has no
+// content yet at the desired tier, getCatalogWords already falls back to the
+// closest available words — this only stops being a no-op once b1+ content
+// is loaded (see the content-volume item on the roadmap).
 function catalogLevelFor(userLevel: number) {
   if (userLevel <= 2) return "pre_a1";
   if (userLevel <= 6) return "a1";
-  return "a2";
+  if (userLevel <= 14) return "a2";
+  return "b1";
 }
 
 function value(row: CatalogRow, ...keys: string[]) {
