@@ -1,5 +1,5 @@
 import { generateOpenAIText, getAIDiagnostic, OpenAIDiagnosticError } from "./_openai.js";
-import { LearnerSnapshot, tutorTeacherInstructions } from "./eduquestTeacher.js";
+import { LearnerSnapshot, tutorTeacherInstructions } from "./_eduquestTeacher.js";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });

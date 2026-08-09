@@ -1,6 +1,6 @@
 import { generateOpenAIText, getAIDiagnostic, parseJsonResponse, OpenAIDiagnosticError } from "./_openai.js";
-import { LearnerSnapshot, learnerContext, missionTeacherInstructions } from "./eduquestTeacher.js";
-import { CatalogWord, getCatalogWords, LearningCatalogError } from "./learningCatalog.js";
+import { LearnerSnapshot, learnerContext, missionTeacherInstructions } from "./_eduquestTeacher.js";
+import { CatalogWord, getCatalogWords, LearningCatalogError } from "./_learningCatalog.js";
 
 const allowedTypes = new Set(["multiple-choice", "arrange-words", "fill-blank", "match-pairs", "writing-challenge"]);
 

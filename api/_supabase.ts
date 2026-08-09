@@ -1,6 +1,6 @@
 /**
  * Generic Supabase REST helper shared by the admin content-import pipeline.
- * Kept separate from learningCatalog.ts's private helper on purpose: the
+ * Kept separate from _learningCatalog.ts's private helper on purpose: the
  * catalog path is already live in production and validated end to end, so
  * it is not touched here to avoid any risk of regressing it.
  */
