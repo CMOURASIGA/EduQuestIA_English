@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Revisão de Conteúdo — EduQuest + Terravox</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2ff; color: #1a1c3d; padding: 24px; }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #6b7280; font-size: 13px; margin: 0 0 24px; }
+  .gate { background: #fff; border-radius: 20px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,.06); max-width: 420px; margin: 60px auto; }
+  .gate label { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #6b7280; display: block; margin-bottom: 6px; }
+  input[type=password], input[type=text], input[type=number] { width: 100%; padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; }
+  button { cursor: pointer; border: none; border-radius: 10px; font-weight: 800; font-size: 12px; text-transform: uppercase; padding: 10px 16px; }
+  .btn-primary { background: #4f46e5; color: #fff; }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-ghost { background: #f3f4f6; color: #374151; }
+  .btn-ghost:hover { background: #e5e7eb; }
+  .btn-approve { background: #d1fae5; color: #047857; }
+  .btn-approve:hover { background: #a7f3d0; }
+  .btn-reject { background: #fee2e2; color: #b91c1c; }
+  .btn-reject:hover { background: #fecaca; }
+  .btn-publish { background: #059669; color: #fff; }
+  .btn-publish:hover { background: #047857; }
+  .card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 4px 16px rgba(0,0,0,.05); margin-bottom: 20px; }
+  .card h2 { font-size: 16px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .card .desc { font-size: 12px; color: #6b7280; margin: 0 0 16px; }
+  .row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .row input, .row select { flex: 1; min-width: 120px; }
+  .item { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .item .txt { font-size: 13px; min-width: 0; }
+  .item .txt b { display: block; }
+  .item .txt span { color: #6b7280; font-size: 12px; }
+  .item .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .item .actions button { padding: 6px 10px; }
+  .empty { color: #9ca3af; font-size: 13px; padding: 8px 0; }
+  .msg { font-size: 13px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; }
+  .msg.ok { background: #d1fae5; color: #047857; }
+  .msg.err { background: #fee2e2; color: #b91c1c; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div id="gate" class="gate">
+      <h1>Revisão de Conteúdo</h1>
+      <p class="sub">Página interna, não faz parte do jogo. A senha não fica salva — precisa digitar de novo a cada visita.</p>
+      <label for="secret-input">Senha administrativa (EduQuest)</label>
+      <input id="secret-input" type="password" placeholder="ADMIN_API_SECRET" />
+      <button class="btn-primary" style="margin-top:12px;width:100%" onclick="unlock()">Entrar</button>
+    </div>
+
+    <div id="app">
+      <h1>Revisão de Conteúdo</h1>
+      <p class="sub">EduQuest/SpaceAcademy (learning_content) e Terravox (questions), num lugar só. Nada aqui vira conteúdo de verdade sem clicar em Aprovar.</p>
+      <div id="global-msg"></div>
+
+      <div class="card">
+        <h2>📚 EduQuest / SpaceAcademy — importar tema novo</h2>
+        <p class="desc">Opcional: a Vercel já importa 5 palavras por dia sozinha. Use isto só se quiser forçar um tema específico agora.</p>
+        <div class="row">
+          <input id="eq-theme" type="text" placeholder="Tema em inglês (ex: food, sports)" />
+          <select id="eq-level">
+            <option value="pre_a1">Pré-A1</option>
+            <option value="a1">A1</option>
+            <option value="a2">A2</option>
+            <option value="b1">B1</option>
+          </select>
+          <input id="eq-amount" type="number" value="5" min="1" max="15" style="max-width:80px" />
+          <button class="btn-primary" onclick="importEduquest()">Importar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📚 EduQuest / SpaceAcademy — pendentes de revisão</h2>
+        <p class="desc">Aprovar aqui não publica sozinho — depois de aprovar, clique em "Publicar aprovados".</p>
+        <div id="eq-list"></div>
+        <div class="row" style="margin-top: 10px;">
+          <button class="btn-ghost" onclick="loadEduquestDrafts()">Atualizar lista</button>
+          <button class="btn-publish" onclick="publishEduquest()">Publicar Aprovados</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🌎 Terravox — pendentes de revisão</h2>
+        <p class="desc">Aprovar aqui já publica direto no Terravox (é assim que o sistema dele funciona).</p>
+        <div id="tv-list"></div>
+        <div class="row" style="margin-top: 10px;">
+          <button class="btn-ghost" onclick="loadTerravoxDrafts()">Atualizar lista</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  let SECRET = "";
+
+  function unlock() {
+    const value = document.getElementById("secret-input").value.trim();
+    if (!value) return;
+    SECRET = value;
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    loadEduquestDrafts();
+    loadTerravoxDrafts();
+  }
+
+  function showMsg(text, ok) {
+    const el = document.getElementById("global-msg");
+    el.innerHTML = `<div class="msg ${ok ? "ok" : "err"}">${text}</div>`;
+    setTimeout(() => { el.innerHTML = ""; }, 6000);
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      ...opts,
+      headers: { "Content-Type": "application/json", "x-admin-secret": SECRET, ...(opts.headers || {}) },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
+    return data;
+  }
+
+  async function importEduquest() {
+    const theme = document.getElementById("eq-theme").value.trim();
+    const targetLevel = document.getElementById("eq-level").value;
+    const amount = Number(document.getElementById("eq-amount").value) || 5;
+    if (!theme) { showMsg("Informe um tema.", false); return; }
+    try {
+      const data = await api("/api/admin-content-import", { method: "POST", body: JSON.stringify({ theme, targetLevel, amount }) });
+      showMsg(`${data.imported} palavra(s) importada(s) como rascunho.`, true);
+      loadEduquestDrafts();
+    } catch (err) {
+      showMsg(err.message, false);
+    }
+  }
+
+  async function loadEduquestDrafts() {
+    const el = document.getElementById("eq-list");
+    el.innerHTML = "<p class='empty'>Carregando...</p>";
+    try {
+      const data = await api("/api/admin-content-list?status=draft");
+      const items = data.items || [];
+      if (!items.length) { el.innerHTML = "<p class='empty'>Nenhum rascunho pendente.</p>"; return; }
+      el.innerHTML = items.map((item) => `
+        <div class="item">
+          <div class="txt">
+            <b>${item.term_en} → ${item.translation_pt}</b>
+            <span>${item.cefr_level} · ${item.theme}${item.example_en ? " · " + item.example_en : ""}</span>
+          </div>
+          <div class="actions">
+            <button class="btn-approve" onclick="reviewEduquest('${item.id}','approved')">Aprovar</button>
+            <button class="btn-reject" onclick="reviewEduquest('${item.id}','archived')">Rejeitar</button>
+          </div>
+        </div>`).join("");
+    } catch (err) {
+      el.innerHTML = `<p class='empty'>${err.message}</p>`;
+    }
+  }
+
+  async function reviewEduquest(id, status) {
+    try {
+      await api("/api/admin-content-review", { method: "POST", body: JSON.stringify({ id, status }) });
+      loadEduquestDrafts();
+    } catch (err) {
+      showMsg(err.message, false);
+    }
+  }
+
+  async function publishEduquest() {
+    try {
+      const data = await api("/api/admin-content-list?status=approved");
+      const ids = (data.items || []).map((item) => item.id);
+      if (!ids.length) { showMsg("Nenhum item aprovado pendente de publicação.", true); return; }
+      const result = await api("/api/admin-content-publish", { method: "POST", body: JSON.stringify({ contentIds: ids, productCode: "eduquest" }) });
+      showMsg(`${result.published} palavra(s) publicada(s) para o EduQuest.`, true);
+    } catch (err) {
+      showMsg(err.message, false);
+    }
+  }
+
+  async function loadTerravoxDrafts() {
+    const el = document.getElementById("tv-list");
+    el.innerHTML = "<p class='empty'>Carregando...</p>";
+    try {
+      const data = await api("/api/admin-terravox-list");
+      const items = data.questions || [];
+      if (!items.length) { el.innerHTML = "<p class='empty'>Nenhuma pergunta pendente (ou integração ainda não configurada).</p>"; return; }
+      el.innerHTML = items.map((item) => `
+        <div class="item">
+          <div class="txt">
+            <b>${item.question_pt_br}</b>
+            <span>${item.category || ""} · certa: ${item.correct_answer_pt_br}</span>
+          </div>
+          <div class="actions">
+            <button class="btn-approve" onclick="reviewTerravox('${item.id}','approve')">Aprovar</button>
+            <button class="btn-reject" onclick="reviewTerravox('${item.id}','reject')">Rejeitar</button>
+          </div>
+        </div>`).join("");
+    } catch (err) {
+      el.innerHTML = `<p class='empty'>${err.message}</p>`;
+    }
+  }
+
+  async function reviewTerravox(id, action) {
+    try {
+      await api("/api/admin-terravox-review", { method: "POST", body: JSON.stringify({ id, action }) });
+      loadTerravoxDrafts();
+    } catch (err) {
+      showMsg(err.message, false);
+    }
+  }
+</script>
+</body>
+</html>

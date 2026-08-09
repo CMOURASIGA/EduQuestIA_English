@@ -11,6 +11,8 @@ import adminContentListHandler from "./api/admin-content-list";
 import adminContentReviewHandler from "./api/admin-content-review";
 import adminContentPublishHandler from "./api/admin-content-publish";
 import cronContentImportHandler from "./api/cron-content-import";
+import adminTerravoxListHandler from "./api/admin-terravox-list";
+import adminTerravoxReviewHandler from "./api/admin-terravox-review";
 
 dotenv.config();
 
@@ -31,6 +33,8 @@ async function startServer() {
   app.post("/api/admin-content-review", (req, res) => void adminContentReviewHandler(req, res));
   app.post("/api/admin-content-publish", (req, res) => void adminContentPublishHandler(req, res));
   app.get("/api/cron-content-import", (req, res) => void cronContentImportHandler(req, res));
+  app.get("/api/admin-terravox-list", (req, res) => void adminTerravoxListHandler(req, res));
+  app.post("/api/admin-terravox-review", (req, res) => void adminTerravoxReviewHandler(req, res));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
