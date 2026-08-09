@@ -2,7 +2,7 @@ import { supabaseRequest, SupabaseRequestError } from "./_supabase.js";
 
 function isAdminRequest(req: any): boolean {
   const secret = process.env.ADMIN_API_SECRET;
-  return Boolean(secret && req.header("x-admin-secret") === secret);
+  return Boolean(secret && req.headers["x-admin-secret"] === secret);
 }
 
 const ALLOWED_PRODUCTS = new Set(["eduquest", "terravox", "spaceacademy"]);

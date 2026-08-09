@@ -4,7 +4,7 @@ import { runContentImport, ContentImportError, CEFR_LEVELS } from "./_contentImp
 
 function isAdminRequest(req: any): boolean {
   const secret = process.env.ADMIN_API_SECRET;
-  return Boolean(secret && req.header("x-admin-secret") === secret);
+  return Boolean(secret && req.headers["x-admin-secret"] === secret);
 }
 
 export default async function handler(req: any, res: any) {

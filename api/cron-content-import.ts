@@ -42,7 +42,7 @@ const THEME_ROTATION: { theme: string; targetLevel: string }[] = [
 
 function isCronRequest(req: any): boolean {
   const secret = process.env.CRON_SECRET;
-  return Boolean(secret && req.header("authorization") === `Bearer ${secret}`);
+  return Boolean(secret && req.headers["authorization"] === `Bearer ${secret}`);
 }
 
 function pickTodayEntry(): { theme: string; targetLevel: string } {
