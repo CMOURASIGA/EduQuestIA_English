@@ -87,6 +87,36 @@
       </div>
 
       <div class="card">
+        <h2>🌎 Terravox — importar da OpenTDB</h2>
+        <p class="desc">Puxa perguntas de trivia (em inglês) da Open Trivia Database e traduz automaticamente. Entram como pendente de revisão — sem GEMINI_API_KEY configurada no Terravox elas ficam com o texto original, sem tradução, e não aparecem na lista abaixo até serem traduzidas.</p>
+        <div class="row">
+          <input id="tv-amount" type="number" value="20" min="1" max="50" style="max-width:90px" title="Quantidade (máx. 50)" />
+          <select id="tv-difficulty">
+            <option value="">Qualquer dificuldade</option>
+            <option value="easy">Fácil</option>
+            <option value="medium">Médio</option>
+            <option value="hard">Difícil</option>
+          </select>
+          <select id="tv-category">
+            <option value="">Qualquer categoria</option>
+            <option value="9">Conhecimentos Gerais</option>
+            <option value="22">Geografia</option>
+            <option value="23">História</option>
+            <option value="17">Ciências</option>
+            <option value="18">Tecnologia</option>
+            <option value="27">Animais</option>
+            <option value="21">Esportes</option>
+            <option value="25">Artes</option>
+            <option value="11">Cinema</option>
+            <option value="12">Música</option>
+            <option value="10">Literatura</option>
+            <option value="15">Jogos</option>
+          </select>
+          <button class="btn-primary" onclick="importTerravox()">Importar</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>🌎 Terravox — pendentes de revisão</h2>
         <p class="desc">Aprovar aqui já publica direto no Terravox (é assim que o sistema dele funciona).</p>
         <div id="tv-list"></div>
@@ -180,6 +210,19 @@
       if (!ids.length) { showMsg("Nenhum item aprovado pendente de publicação.", true); return; }
       const result = await api("/api/admin-content-publish", { method: "POST", body: JSON.stringify({ contentIds: ids, productCode: "eduquest" }) });
       showMsg(`${result.published} palavra(s) publicada(s) para o EduQuest.`, true);
+    } catch (err) {
+      showMsg(err.message, false);
+    }
+  }
+
+  async function importTerravox() {
+    const amount = Number(document.getElementById("tv-amount").value) || 20;
+    const difficulty = document.getElementById("tv-difficulty").value;
+    const categoryId = document.getElementById("tv-category").value;
+    try {
+      const data = await api("/api/admin-terravox-import", { method: "POST", body: JSON.stringify({ amount, difficulty, categoryId }) });
+      showMsg(`${data.imported} pergunta(s) importada(s)${data.duplicates ? ` (${data.duplicates} duplicada(s) ignorada(s))` : ""}.`, true);
+      loadTerravoxDrafts();
     } catch (err) {
       showMsg(err.message, false);
     }
