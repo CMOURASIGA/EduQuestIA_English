@@ -42,14 +42,16 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify(update),
     });
     if (!response.ok) {
-      const detail = await response.text().catch(() => "");
+      const detail = (await response.text().catch(() => "")).slice(0, 400);
       console.error("Terravox admin review error:", response.status, detail);
-      return res.status(502).json({ error: "O Terravox recusou a atualização." });
+      // Surfaced to the browser on purpose — see admin-terravox-list.ts for why.
+      return res.status(502).json({ error: `O Terravox respondeu ${response.status} em ${url}: ${detail || "(corpo vazio)"}` });
     }
     const data = await response.json();
     return res.status(200).json({ question: data.question ?? data });
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     console.error("Terravox admin review unreachable:", error);
-    return res.status(502).json({ error: "Não foi possível alcançar o Terravox." });
+    return res.status(502).json({ error: `Não foi possível alcançar o Terravox (${baseUrl}): ${detail}` });
   }
 }

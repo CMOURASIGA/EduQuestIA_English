@@ -30,14 +30,20 @@ export default async function handler(req: any, res: any) {
     const url = `${baseUrl.replace(/\/$/, "")}/api/admin/questions?review_status=pending&translation_status=translated`;
     const response = await fetch(url, { headers: { "x-admin-secret": secret } });
     if (!response.ok) {
-      const detail = await response.text();
+      const detail = (await response.text()).slice(0, 400);
       console.error("Terravox admin list error:", response.status, detail);
-      return res.status(502).json({ error: "O Terravox não respondeu como esperado." });
+      // Surfaced to the browser on purpose: only Terravox's own status/body
+      // (never the secret), so a screenshot of the review page's network
+      // tab is enough to diagnose wrong URL vs wrong secret vs a real crash
+      // on Terravox's side, without needing to cross-reference two separate
+      // Vercel log dashboards each time.
+      return res.status(502).json({ error: `O Terravox respondeu ${response.status} em ${url}: ${detail || "(corpo vazio)"}` });
     }
     const data = await response.json();
     return res.status(200).json({ questions: data.questions ?? [] });
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
     console.error("Terravox admin list unreachable:", error);
-    return res.status(502).json({ error: "Não foi possível alcançar o Terravox." });
+    return res.status(502).json({ error: `Não foi possível alcançar o Terravox (${baseUrl}): ${detail}` });
   }
 }
