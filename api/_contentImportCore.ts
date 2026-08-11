@@ -27,6 +27,43 @@ export class ContentImportError extends Error {
 }
 
 export const CEFR_LEVELS = new Set(["pre_a1", "a1", "a2", "b1"]);
+const PRODUCT_CODE = "eduquest";
+
+// Rede de segurança independente do prompt: mesmo pedindo pra IA nunca
+// gerar conteúdo impróprio, um item que citar qualquer um desses termos
+// (em inglês ou português, na palavra ou nos exemplos) nunca é
+// auto-aprovado — cai como rascunho normal para revisão humana, como
+// sempre foi. Não é uma lista exaustiva de moderação, é só a segunda
+// camada antes de publicar algo sem olhos humanos.
+const UNSAFE_TERMS = [
+  "sex", "sexo", "porn", "pornô", "nude", "nu ", "kill", "matar", "suicide", "suicídio",
+  "drug", "droga", "cocaine", "cocaína", "weapon", "arma", "gun", "blood", "sangue",
+  "hate", "ódio", "racis", "nazi", "damn", "merda", "porra", "fuck", "puta",
+];
+
+function containsUnsafeTerm(...texts: (string | null | undefined)[]): boolean {
+  const combined = texts.filter(Boolean).join(" ").toLowerCase();
+  return UNSAFE_TERMS.some((term) => combined.includes(term));
+}
+
+/**
+ * Heurísticas leves que decidem se um item gerado 100% pela IA (não há
+ * fonte externa validando, diferente do banco de trivia do Terravox) pode
+ * ser publicado sozinho ou precisa de revisão humana. Passar aqui não é
+ * garantia de qualidade pedagógica — é só a rede mínima contra os erros
+ * mais óbvios (tradução vazia/igual à palavra, frase de exemplo que nem
+ * cita a palavra, conteúdo sensível).
+ */
+function passesAutoQualityGate(row: { term_en: string; translation_pt: string; example_en: string | null; example_pt: string | null; cefr_level: string }): boolean {
+  const term = row.term_en.trim().toLowerCase();
+  const translation = row.translation_pt.trim().toLowerCase();
+  if (!term || !translation || term === translation) return false;
+  if (term.length > 40 || translation.length > 60) return false;
+  if (!row.example_en?.trim() || !row.example_pt?.trim()) return false;
+  if (!row.example_en.toLowerCase().includes(term.split(" ")[0])) return false;
+  if (containsUnsafeTerm(row.term_en, row.translation_pt, row.example_en, row.example_pt)) return false;
+  return true;
+}
 
 function slugify(text: string): string {
   return text
@@ -102,8 +139,8 @@ const importJsonSchema = {
   },
 } as const;
 
-export async function runContentImport(params: { theme: string; targetLevel: string; amount: number }): Promise<{ imported: number; items: any[] }> {
-  const { theme, targetLevel, amount } = params;
+export async function runContentImport(params: { theme: string; targetLevel: string; amount: number; autoApprove?: boolean }): Promise<{ imported: number; autoApproved: number; items: any[] }> {
+  const { theme, targetLevel, amount, autoApprove = false } = params;
   const candidates = await fetchThemeWords(theme, amount);
   if (!candidates.length) throw new ContentImportError("A Datamuse não retornou nenhuma palavra para esse tema. Tente um termo mais comum em inglês.");
 
@@ -128,28 +165,79 @@ export async function runContentImport(params: { theme: string; targetLevel: str
 
   const rows = parsed.items
     .filter((item) => typeof item?.term_en === "string" && item.term_en.trim() && typeof item?.translation_pt === "string" && item.translation_pt.trim())
-    .map((item) => ({
-      slug: `${targetLevel}-${slugify(String(item.term_en))}`,
-      language_code: "en",
-      content_kind: "vocabulary",
-      cefr_level: CEFR_LEVELS.has(item.cefr_level) ? item.cefr_level : targetLevel,
-      theme,
-      term_en: String(item.term_en).trim(),
-      translation_pt: String(item.translation_pt).trim(),
-      example_en: String(item.example_en || "").trim() || null,
-      example_pt: String(item.example_pt || "").trim() || null,
-      source_name: "datamuse+dictionaryapi.dev+openai",
-      source_url: "https://api.datamuse.com/ ; https://dictionaryapi.dev/",
-      license_note: "Palavra descoberta via Datamuse (API pública gratuita); frase de exemplo via dictionaryapi.dev (dados do Wiktionary, CC BY-SA) quando disponível; tradução e revisão de adequação via OpenAI. Requer aprovação humana antes de publicar.",
-      status: "draft",
-    }));
+    .map((item) => {
+      const cefr_level = CEFR_LEVELS.has(item.cefr_level) ? item.cefr_level : targetLevel;
+      const term_en = String(item.term_en).trim();
+      const translation_pt = String(item.translation_pt).trim();
+      const example_en = String(item.example_en || "").trim() || null;
+      const example_pt = String(item.example_pt || "").trim() || null;
+      // Só passa pro auto-aprovado quando o chamador pediu (cron) E o item
+      // sobrevive à rede de segurança mínima — qualquer outra combinação
+      // cai como "draft" de sempre, esperando revisão humana.
+      const autoApproved = autoApprove && passesAutoQualityGate({ term_en, translation_pt, example_en, example_pt, cefr_level });
+      return {
+        slug: `${targetLevel}-${slugify(term_en)}`,
+        language_code: "en",
+        content_kind: "vocabulary",
+        cefr_level,
+        theme,
+        term_en,
+        translation_pt,
+        example_en,
+        example_pt,
+        source_name: "datamuse+dictionaryapi.dev+openai",
+        source_url: "https://api.datamuse.com/ ; https://dictionaryapi.dev/",
+        license_note: autoApproved
+          ? "Palavra descoberta via Datamuse (API pública gratuita); frase de exemplo via dictionaryapi.dev (dados do Wiktionary, CC BY-SA) quando disponível; tradução e revisão de adequação via OpenAI. Aprovado automaticamente pelo cron após passar no filtro de qualidade — sem revisão humana."
+          : "Palavra descoberta via Datamuse (API pública gratuita); frase de exemplo via dictionaryapi.dev (dados do Wiktionary, CC BY-SA) quando disponível; tradução e revisão de adequação via OpenAI. Requer aprovação humana antes de publicar.",
+        status: autoApproved ? "approved" : "draft",
+        _autoApproved: autoApproved,
+      };
+    });
   if (!rows.length) throw new ContentImportError("Nenhum item retornado pela IA passou na validação mínima (term_en/translation_pt).", 502);
 
   const insertResponse = await supabaseRequest("learning_content", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify(rows),
+    body: JSON.stringify(rows.map(({ _autoApproved, ...row }) => row)),
   });
-  const inserted = await insertResponse.json();
-  return { imported: Array.isArray(inserted) ? inserted.length : 0, items: inserted };
+  const inserted = (await insertResponse.json()) as { id: string; slug: string }[];
+
+  // rows e inserted mantêm a mesma ordem (Postgres preserva a ordem de
+  // inserção do array no retorno de um POST em lote), então dá pra casar
+  // pelo índice sem precisar re-consultar por slug.
+  const autoApprovedIds = inserted.filter((_, index) => rows[index]?._autoApproved).map((row) => row.id);
+  if (autoApprovedIds.length) {
+    await supabaseRequest("product_content_publications", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(autoApprovedIds.map((contentId) => ({
+        content_id: contentId,
+        product_code: PRODUCT_CODE,
+        is_active: true,
+        configuration: { eligible_for_auto_mission: true },
+      }))),
+    });
+  }
+
+  return { imported: inserted.length, autoApproved: autoApprovedIds.length, items: inserted };
+}
+
+/**
+ * Quantas palavras já publicadas (aprovadas + ativas pro EduQuest) existem
+ * por nível CEFR — usado pelo cron para decidir qual nível está mais raso
+ * e merece a importação do dia, em vez de só girar por um calendário fixo.
+ * PostgREST não faz join+group-by num único request, então busca os ids
+ * publicados e conta os níveis em memória (volume baixo o bastante pra
+ * isso ser barato).
+ */
+export async function getPublishedLevelCounts(): Promise<Record<string, number>> {
+  const pubResponse = await supabaseRequest(`product_content_publications?select=content_id&product_code=eq.${PRODUCT_CODE}&is_active=eq.true&limit=1000`);
+  const pubRows = (await pubResponse.json()) as { content_id: string }[];
+  if (!pubRows.length) return {};
+  const contentResponse = await supabaseRequest(`learning_content?select=cefr_level&id=in.(${pubRows.map((row) => row.content_id).join(",")})`);
+  const contentRows = (await contentResponse.json()) as { cefr_level: string }[];
+  const counts: Record<string, number> = {};
+  for (const row of contentRows) counts[row.cefr_level] = (counts[row.cefr_level] ?? 0) + 1;
+  return counts;
 }

@@ -1,6 +1,6 @@
 import { SupabaseRequestError } from "./_supabase.js";
 import { getAIDiagnostic, OpenAIDiagnosticError } from "./_openai.js";
-import { runContentImport, ContentImportError } from "./_contentImportCore.js";
+import { runContentImport, getPublishedLevelCounts, ContentImportError } from "./_contentImportCore.js";
 
 /**
  * Fired daily by Vercel Cron (see vercel.json). Vercel automatically signs
@@ -8,11 +8,24 @@ import { runContentImport, ContentImportError } from "./_contentImportCore.js";
  * is configured — verified below so nobody else can trigger this by
  * guessing the path.
  *
- * Same safety property as the manual admin endpoint: this only ever inserts
- * drafts. A human still has to review (admin-content-review) and publish
- * (admin-content-publish) before anything reaches a mission — this just
- * removes the "someone has to remember to run the import" chore.
+ * Unlike the manual admin endpoint (always drafts), this cron runs with
+ * autoApprove: true — runContentImport applies an automated quality gate
+ * (see passesAutoQualityGate in _contentImportCore.ts) and only items that
+ * pass it get published straight to the catalog, no human involved.
+ * Anything that doesn't pass still lands as a normal "draft" for the admin
+ * dashboard, same as before. This mirrors the dynamic/autonomous refill
+ * built for Terravox's question bank, adapted for the fact that this
+ * content has no external source grounding it (Terravox translates
+ * community-curated trivia; this is 100% AI-authored vocabulary) — hence
+ * the extra automated gate instead of a blanket auto-approve.
+ *
+ * Level targeting is stock-aware, not just a blind calendar rotation:
+ * whichever CEFR level has the fewest published words gets today's import
+ * (this is what actually closes gaps like the thin b1 catalog mentioned in
+ * _learningCatalog.ts). Only once every level clears the floor does it
+ * fall back to the theme rotation below for steady, varied growth.
  */
+const MIN_PUBLISHED_PER_LEVEL = 20;
 
 // Cycle deterministically through themes and levels so every run makes
 // forward progress on the catalog without needing any manual input. Order
@@ -45,19 +58,41 @@ function isCronRequest(req: any): boolean {
   return Boolean(secret && req.headers["authorization"] === `Bearer ${secret}`);
 }
 
-function pickTodayEntry(): { theme: string; targetLevel: string } {
+function dayOfYear(): number {
   const now = new Date();
-  const dayOfYear = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000);
-  return THEME_ROTATION[dayOfYear % THEME_ROTATION.length];
+  return Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000);
+}
+
+function pickEntryForLevel(targetLevel: string): { theme: string; targetLevel: string } {
+  const themesForLevel = THEME_ROTATION.filter((entry) => entry.targetLevel === targetLevel);
+  return themesForLevel[dayOfYear() % themesForLevel.length];
+}
+
+// Levels a b1 antes dos demais: é o nível mais raso hoje (ver o comentário
+// de roadmap em _learningCatalog.ts), então quando mais de um nível está
+// abaixo do piso, prioriza fechar esse gap primeiro.
+const LEVEL_PRIORITY = ["b1", "a2", "a1", "pre_a1"];
+
+async function pickTodayEntry(): Promise<{ theme: string; targetLevel: string }> {
+  try {
+    const counts = await getPublishedLevelCounts();
+    const thin = LEVEL_PRIORITY.find((level) => (counts[level] ?? 0) < MIN_PUBLISHED_PER_LEVEL);
+    if (thin) return pickEntryForLevel(thin);
+  } catch (error) {
+    // Se a checagem de estoque falhar por qualquer motivo, não trava o
+    // cron inteiro — só cai pro rodízio de sempre.
+    console.warn("[cron-content-import] Não foi possível checar o estoque por nível, usando rodízio padrão:", error instanceof Error ? error.message : error);
+  }
+  return THEME_ROTATION[dayOfYear() % THEME_ROTATION.length];
 }
 
 export default async function handler(req: any, res: any) {
   if (!isCronRequest(req)) return res.status(401).json({ error: "Acesso restrito ao cron da Vercel." });
 
-  const { theme, targetLevel } = pickTodayEntry();
+  const { theme, targetLevel } = await pickTodayEntry();
   try {
-    const result = await runContentImport({ theme, targetLevel, amount: 5 });
-    console.log(`[cron-content-import] Importadas ${result.imported} palavra(s) de '${theme}' (${targetLevel}).`);
+    const result = await runContentImport({ theme, targetLevel, amount: 5, autoApprove: true });
+    console.log(`[cron-content-import] Importadas ${result.imported} palavra(s) de '${theme}' (${targetLevel}), ${result.autoApproved} aprovada(s) e publicada(s) automaticamente.`);
     return res.status(200).json({ theme, targetLevel, ...result });
   } catch (error) {
     // "Nothing new for this theme/level today" is an expected outcome as the
